@@ -1,0 +1,13 @@
+node_modules
+dist
+oclif.manifest.json
+opencli.json
+*.log
+.DS_Store
+/coverage/
+*.tsbuildinfo
+.npmrc
+.claude/
+
+# Il package manager è pnpm (mise): il lock npm non si versiona.
+package-lock.json

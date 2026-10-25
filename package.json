@@ -1,0 +1,261 @@
+{
+  "name": "@bussolabs/closeyourit-cli",
+  "version": "0.36.0",
+  "description": "CLI for CloseYourIt — manage org, errors, tokens and tickets with your user token",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bussolabs/closeyourit-cli-community.git"
+  },
+  "license": "MIT",
+  "bin": {
+    "closeyourit": "./bin/run.js",
+    "cyi": "./bin/run.js"
+  },
+  "files": [
+    "/bin",
+    "/dist",
+    "/oclif.manifest.json",
+    "/opencli.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@oclif/core": "^4.13.3",
+    "@oclif/plugin-help": "^6.2.58",
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "vitest": "^4.1.11"
+  },
+  "oclif": {
+    "bin": "closeyourit",
+    "dirname": "closeyourit",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help"
+    ],
+    "topics": {
+      "artifacts": {
+        "description": "Private build artifacts"
+      },
+      "artifacts:source-maps": {
+        "description": "Upload and manage source maps without source contents"
+      },
+      "artifacts:proguard-maps": {
+        "description": "Upload and manage private ProGuard/R8 mappings"
+      },
+      "projects": {
+        "description": "Browse visible projects"
+      },
+      "projects:settings": {
+        "description": "Per-project settings: log/analytics retention and feature flags"
+      },
+      "groups": {
+        "description": "Groups: containers of related projects (macro-projects)"
+      },
+      "environments": {
+        "description": "Environments (production, staging, …) shared by projects, tokens and monitors"
+      },
+      "platforms": {
+        "description": "Platforms (devices/systems) your projects and tickets run on"
+      },
+      "errors": {
+        "description": "Error monitoring: list, show, triage, assign, merge/split, delete"
+      },
+      "errors:grouping-rules": {
+        "description": "Custom grouping rules: how a project bends the automatic error grouping"
+      },
+      "tokens": {
+        "description": "Project ingest tokens (CI/SDK credentials)"
+      },
+      "tokens:provisions": {
+        "description": "GitHub provisioning of an ingest token: status and retry (never the secret)"
+      },
+      "secrets": {
+        "description": "Encrypted environment variables and versioned secret files"
+      },
+      "secrets:assets": {
+        "description": "Encrypted secret files: upload, download, versions, delegation"
+      },
+      "personal": {
+        "description": "Personal (per-user) encrypted secrets for the current organization"
+      },
+      "shared": {
+        "description": "Organization-level shared secret variables, delegated to projects"
+      },
+      "vault": {
+        "description": "Vault review: the secret changes waiting for a second approval"
+      },
+      "vault:requests": {
+        "description": "Secret change requests: list, approve, reject (four-eyes, decided by a person)"
+      },
+      "tickets": {
+        "description": "Tickets: list, show, create, ask"
+      },
+      "tickets:dependencies": {
+        "description": "Ticket prerequisites: what has to be finished before a ticket can start"
+      },
+      "tickets:questions": {
+        "description": "Questions on a ticket: ask, answer, withdraw (they live apart from the discussion)"
+      },
+      "tickets:lease": {
+        "description": "Working lease on a ticket: claim, renew, release (one worker at a time)"
+      },
+      "milestones": {
+        "description": "Project milestones: dated goals a ticket can be assigned to"
+      },
+      "assistant": {
+        "description": "AI assistant that reads the data you can see and answers questions about it"
+      },
+      "puck": {
+        "description": "Your Puckies (AI coworkers): let them use this computer, one approved request at a time"
+      },
+      "assistant:conversations": {
+        "description": "Conversations with the assistant (list, open, read, delete)"
+      },
+      "ideas": {
+        "description": "Project ideas: propose, vote, comment, convert to ticket (AI draft)"
+      },
+      "metrics": {
+        "description": "Performance metrics (slow queries/methods)"
+      },
+      "coverage": {
+        "description": "Test coverage published by the CI (last snapshot per branch)"
+      },
+      "usage": {
+        "description": "Usage the product reported as actually executed (routes, jobs, custom keys)"
+      },
+      "vulnerabilities": {
+        "description": "Dependency vulnerabilities and runtime support: triage, ignore, promote to ticket"
+      },
+      "seo": {
+        "description": "SEO findings of the watched sites: triage, ignore, promote to ticket"
+      },
+      "seo-sites": {
+        "description": "Sites under SEO check: declare, configure, remove"
+      },
+      "logs": {
+        "description": "Structured logs stream (cross-app)"
+      },
+      "alerts": {
+        "description": "Alert rules, external delivery channels and your own notifications"
+      },
+      "alerts:channels": {
+        "description": "External delivery channels for alerts (webhook, Telegram)"
+      },
+      "alerts:notifications": {
+        "description": "Your in-app notification inbox: list, mark read, delete"
+      },
+      "alerts:preferences": {
+        "description": "Your personal alert preferences, per organization"
+      },
+      "agents": {
+        "description": "Org automator tokens (cyi_a_) used to bootstrap an Agent Host"
+      },
+      "agents:tokens": {
+        "description": "The automator tokens themselves: create, list, revoke (the secret is shown only once)"
+      },
+      "servers": {
+        "description": "Server monitoring fleet (agents, enrollment tokens)"
+      },
+      "servers:tokens": {
+        "description": "Fleet enrollment tokens (server agents authenticate with these)"
+      },
+      "monitors": {
+        "description": "Uptime monitors of a project: checks, public status page, incidents"
+      },
+      "monitors:announcements": {
+        "description": "Announcement banner shown on a monitor's public status page"
+      },
+      "monitors:incidents": {
+        "description": "Uptime incidents: group them and narrate them step by step"
+      },
+      "kb": {
+        "description": "Knowledge base: pages (notes/decisions/guides), semantic search and AI ask"
+      },
+      "kb:book": {
+        "description": "Knowledge books: ordered collections of pages (summary, add a page)"
+      },
+      "todos": {
+        "description": "Personal todo lists: items, sharing, completion"
+      },
+      "todos:items": {
+        "description": "Items of a todo list: add, list, update, delete"
+      },
+      "workload": {
+        "description": "Team workload actions (non-dev activities): participants, link or generate a ticket"
+      },
+      "workload:participant": {
+        "description": "People taking part in a workload action (members of its team)"
+      },
+      "analytics": {
+        "description": "Web analytics: stats, conversion goals, public share"
+      },
+      "analytics:goals": {
+        "description": "Conversion goals of a project: create, list, delete"
+      },
+      "uptime-groups": {
+        "description": "Uptime monitor groups (org-level) + public status page"
+      },
+      "releases": {
+        "description": "Project releases (read-only)"
+      },
+      "cron-monitors": {
+        "description": "Cron/heartbeat monitors (read-only)"
+      },
+      "guidance": {
+        "description": "Project guidance: effective references and procedures (resolved by the backend)"
+      },
+      "matrix": {
+        "description": "Product feature × platform matrix: categories, features, cells"
+      },
+      "matrix:categories": {
+        "description": "Feature groups (categories): how the rows of a product matrix are organized"
+      },
+      "matrix:features": {
+        "description": "Features: the rows of a product matrix"
+      },
+      "matrix:cells": {
+        "description": "Matrix cells: how far a feature is on a platform, and since which version"
+      },
+      "org": {
+        "description": "Organization settings, and switching between your organizations"
+      },
+      "members": {
+        "description": "Organization members: profile, role, access scope"
+      },
+      "invitations": {
+        "description": "Invitations to join the organization: create, resend, revoke"
+      },
+      "teams": {
+        "description": "Teams: people bundled with roles and a group/project scope"
+      },
+      "roles": {
+        "description": "RBAC roles: named bundles of permission keys"
+      },
+      "service-accounts": {
+        "description": "Service accounts (AI members, CLI-only) and their secret access"
+      },
+      "service-accounts:tokens": {
+        "description": "CLI tokens (cyi_u_) of a service account (the secret is shown only once)"
+      },
+      "artifacts:native-symbols": {
+        "description": "Upload and manage private native debug files"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "prepack": "pnpm build && node scripts/generate-manifest.mjs && node scripts/generate-opencli.mjs",
+    "postpack": "rm -f oclif.manifest.json opencli.json",
+    "test": "vitest run --coverage",
+    "lint": "tsc --noEmit"
+  }
+}
