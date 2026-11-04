@@ -129,6 +129,10 @@ describe('buildOpenCliDocument', () => {
     expect((doc as Record<string, unknown>).commands).toBeUndefined()
   })
 
+  it('lists one exit code per kind of error (CYCL-82)', () => {
+    expect(build().command.exitCodes?.map((exit) => exit.code)).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
   it('maps info from package.json (title, description, summary, license)', () => {
     const doc = build()
     expect(doc.info.description).toBe('Manage CloseYourIt from the CLI.')

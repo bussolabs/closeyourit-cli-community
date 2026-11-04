@@ -90,20 +90,20 @@ describe('tickets dependencies', () => {
       apiMock.post.mockRejectedValue(apiError(422, 'R422-TICKET-017', 'Dipendenza non valida'))
       apiMock.get.mockResolvedValue(envelope([{id: 'dep-1', code: 'QUALCUN-ALTRO'}]))
 
-      await runExpectingExit(TicketsDependenciesAdd, [T, 'CYAU-83', '--project', PID], 1)
+      await runExpectingExit(TicketsDependenciesAdd, [T, 'CYAU-83', '--project', PID], 2)
     })
 
     it('a cycle between prerequisites always propagates: the row is wrong and must be seen', async () => {
       apiMock.post.mockRejectedValue(apiError(422, 'R422-TICKET-013', 'Ciclo'))
 
-      await runExpectingExit(TicketsDependenciesAdd, [T, 'CYAU-83', '--project', PID], 1)
+      await runExpectingExit(TicketsDependenciesAdd, [T, 'CYAU-83', '--project', PID], 2)
       expect(apiMock.get).not.toHaveBeenCalled()
     })
 
     it('a prerequisite that does not exist always propagates', async () => {
       apiMock.post.mockRejectedValue(apiError(404, 'R404-TICKET-015', 'Blocker non trovato'))
 
-      await runExpectingExit(TicketsDependenciesAdd, [T, 'MAI-1', '--project', PID], 1)
+      await runExpectingExit(TicketsDependenciesAdd, [T, 'MAI-1', '--project', PID], 5)
       expect(apiMock.get).not.toHaveBeenCalled()
     })
   })

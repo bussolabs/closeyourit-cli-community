@@ -66,7 +66,7 @@ describe('teams — full flag coverage', () => {
 
   it('exits C404 when a member email matches no org member', async () => {
     apiMock.get.mockResolvedValue(envelope([{account_id: MID, email: 'someone@acme.test'}]))
-    const {stderr} = await runExpectingExit(TeamsCreate, ['DriverOne', '--member', 'ghost@acme.test'])
+    const {stderr} = await runExpectingExit(TeamsCreate, ['DriverOne', '--member', 'ghost@acme.test'], 5)
     expect(stderr).toContain('C404-MBR-001')
   })
 
@@ -161,7 +161,7 @@ describe('teams add-member / remove-member', () => {
 
   it('exits non-zero when reading the team fails', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-TEM-001', 'no team'))
-    const {stderr} = await runExpectingExit(TeamsAddMember, [TID, MID])
+    const {stderr} = await runExpectingExit(TeamsAddMember, [TID, MID], 5)
     expect(stderr).toContain('R404-TEM-001')
   })
 })

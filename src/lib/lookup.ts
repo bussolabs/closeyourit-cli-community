@@ -80,7 +80,7 @@ export async function fetchLookupRows<T>(api: CliApi, path: string, hint: string
     } while (page <= totalPages)
   } catch (error) {
     if (error instanceof ApiRequestError && error.status === 403) {
-      throw new ApiRequestError(error.status, error.code, `${error.message}. ${hint}`)
+      throw new ApiRequestError(error.status, error.code, `${error.message}. ${hint}`, undefined, error.nextSteps)
     }
 
     throw error

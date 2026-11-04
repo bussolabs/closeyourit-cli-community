@@ -34,7 +34,7 @@ describe('tokens list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-TOK-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(TokensList, ['--project', PID])
+    const {stderr} = await runExpectingExit(TokensList, ['--project', PID], 4)
     expect(stderr).toContain('R403-TOK-001')
   })
 })

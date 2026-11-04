@@ -79,7 +79,7 @@ describe('alerts list / show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-ALR-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(AlertsList, [])
+    const {stderr} = await runExpectingExit(AlertsList, [], 4)
     expect(stderr).toContain('R403-ALR-001')
   })
 })

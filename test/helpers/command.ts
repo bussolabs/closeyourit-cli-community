@@ -86,7 +86,8 @@ export async function runCaptured(
  * Run a command expecting it to exit non-zero and assert its exit code.
  *
  * Two failure shapes reach here:
- *  - `ApiRequestError` → `base.catch` prints `code: message` to stderr, then `exit(1)`.
+ *  - `ApiRequestError` → `base.catch` prints `code: message` to stderr, then exits with the code of
+ *    its kind (`exitCodeFor`: 2 invalid input, 3 confirmation, 4 access, 5 not found, else 1).
  *  - `this.error(msg, {exit})` (e.g. the `--confirm` guards) → oclif throws a CLIError with
  *    that exit code; the message lives on the error (`.message`), not on stderr in-process.
  * The returned `message` merges both so callers can assert on the text either way.

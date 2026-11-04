@@ -74,7 +74,7 @@ describe('kb attachments', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-002', 'not found'))
-    const {stderr} = await runExpectingExit(KbAttachments, [ID])
+    const {stderr} = await runExpectingExit(KbAttachments, [ID], 5)
     expect(stderr).toContain('R404-KNOWLEDGE-002')
   })
 })
@@ -121,7 +121,7 @@ describe('kb attach', () => {
   it('exits non-zero when the server rejects the file', async () => {
     vi.mocked(readFile).mockResolvedValue(Buffer.from('x'))
     apiMock.upload.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-008', 'file non ammesso'))
-    const {stderr} = await runExpectingExit(KbAttach, [ID, '--file', './a.exe'])
+    const {stderr} = await runExpectingExit(KbAttach, [ID, '--file', './a.exe'], 2)
     expect(stderr).toContain('R422-KNOWLEDGE-008')
   })
 })
@@ -158,7 +158,7 @@ describe('kb attachment-download', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.download.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-002', 'not found'))
-    const {stderr} = await runExpectingExit(KbAttachmentDownload, [ID, 'a1'])
+    const {stderr} = await runExpectingExit(KbAttachmentDownload, [ID, 'a1'], 5)
     expect(stderr).toContain('R404-KNOWLEDGE-002')
     expect(vi.mocked(writeFile)).not.toHaveBeenCalled()
   })
@@ -181,7 +181,7 @@ describe('kb detach', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.delete.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(KbDetach, [ID, '--attachment', 'a1', '--confirm'])
+    const {stderr} = await runExpectingExit(KbDetach, [ID, '--attachment', 'a1', '--confirm'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

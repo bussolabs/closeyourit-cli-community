@@ -226,7 +226,7 @@ describe('service-accounts update', () => {
     const {message, stdout} = await runExpectingExit(
       ServiceAccountsUpdate,
       [ACC, '--secret-environment', 'staging', '--secret-environment', 'canary'],
-      1,
+      5,
     )
     expect(message).toContain('canary')
     expect(message).toContain('C404-SVA-001')
@@ -237,7 +237,7 @@ describe('service-accounts update', () => {
   it('if every code is dropped the boundary disappears: it says so as an opening to all environments', async () => {
     apiMock.get.mockResolvedValue(envelope([...ORG_ENVS, {id: 'e3', code: 'canary'}]))
     apiMock.put.mockResolvedValue(envelope({id: ACC, name: 'Bot', handle: 'bot', secret_environment_codes: []}))
-    const {message} = await runExpectingExit(ServiceAccountsUpdate, [ACC, '--secret-environment', 'canary'], 1)
+    const {message} = await runExpectingExit(ServiceAccountsUpdate, [ACC, '--secret-environment', 'canary'], 5)
     expect(message).toContain('all environments')
   })
 
@@ -246,7 +246,7 @@ describe('service-accounts update', () => {
     apiMock.put.mockResolvedValue(
       envelope({id: ACC, name: 'Bot', handle: 'bot', secret_environment_codes: ['staging', 'production']}),
     )
-    const {message} = await runExpectingExit(ServiceAccountsUpdate, [ACC, '--secret-environment', 'staging'], 1)
+    const {message} = await runExpectingExit(ServiceAccountsUpdate, [ACC, '--secret-environment', 'staging'], 5)
     expect(message).toContain('production')
     expect(message).toContain('C404-SVA-001')
   })

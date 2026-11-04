@@ -40,7 +40,7 @@ export function describeLeaseConflict(error: unknown): unknown {
 
   const who = holder.name ? `${holder.kind} "${holder.name}"` : `${holder.kind} ${holder.id}`
   const until = holder.expiresAt ? ` until ${holder.expiresAt}` : ''
-  return new ApiRequestError(error.status, error.code, `Ticket already leased by ${who}${until}.`, error.details)
+  return new ApiRequestError(error.status, error.code, `Ticket already leased by ${who}${until}.`, error.details, error.nextSteps)
 }
 
 /** Allow-listed `details` for the --json envelope: only the fields a lease conflict is documented to carry. */

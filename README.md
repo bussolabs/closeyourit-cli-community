@@ -147,6 +147,13 @@ a visible project; upload/delete also require `artifacts.manage` through the exi
 | `vault requests list` | List the secret changes waiting for a second approval, across every visible project (org-level, no `--project`). Shows the name and the intent, never the proposed value. |
 | `vault requests approve <id>` | Apply a pending secret change. Four-eyes: whoever asked for it cannot approve it, and a service account never decides — only a person. |
 | `vault requests reject <id> --reason <why>` | Freeze a pending secret change as rejected; nothing changes in the vault and the reason reaches whoever asked. `--reason` is required and cannot be blank. |
+| `approvals list [--state] [--project <key>] [--agent <id>] [--all]` | List the requests waiting for your decision (plans, reviews, agent questions, secret changes), oldest first. Requests deferred to tomorrow are hidden unless `--all`. |
+| `approvals show <ref>` | Show one request in full: ticket, plan, report, questions with the recommended option, why the work stopped, the decisions you can take and the web address. `<ref>` is the key (`agent_plan:<id>`) or a ticket code (`CYRA-12`). |
+| `approvals approve <ref> [--note]` · `reject <ref> --reason` · `ask <ref> --text` · `reassess <ref>` | Decide a request. A rejection needs a non-blank reason. |
+| `approvals reply <ref> [--text] [--pick <question>=<option> …]` | Answer the agent's questions: pick proposed answers by number, write your own, or both. |
+| `approvals retry <ref>` · `cancel <ref> --reason` | On stopped work (`review_blocked`) only: start it again, or cancel the workflow. |
+| `approvals defer <ref>` | Hide a request until tomorrow morning; nothing is decided. |
+| `approvals review [--state] [--project <key>]` | Go through the queue one card at a time from the terminal: approve, reject, ask, reply, reassess, skip, defer, open in the browser or quit; prints a summary at the end. Needs a terminal. |
 | `tickets list --project <id\|key> [--page] [--agent-eligibility] [--assignee me] [--open]` | List tickets. `--assignee me --open` keeps only your unfinished tickets (needs the server from closeyourit-rails v0.180.0). |
 | `tickets show <id> --project <id\|key>` | Show one ticket. |
 | `tickets create --project <id\|key> --title <t> [--kind bug\|story\|task\|epic] [--parent-id] [--step-*] [--description] [--status <code\|label\|id>] [--priority <code\|label\|id>]` | Create a ticket. `--status` defaults to `open` and `--priority` to `medium`, and both take a code or a label (`in_progress`, `"In Progress"`), so no id lookup is needed. Length caps: title 255, description 4000, technical analysis 1500 characters — every field over the cap is listed at once, before the call. |
@@ -210,6 +217,10 @@ a visible project; upload/delete also require `artifacts.manage` through the exi
 | `kb book list [--project <id\|key>] [--q <text>] [--per] [--page]` | List knowledge books (ordered collections of pages). Cross-project: omit `--project` for every visible project. |
 | `kb book show <id>` | Show a book: metadata, then the summary of the pages it collects (`#` is the 0-based position). |
 | `kb book add-page <id> --page <page-id> [--position <n>]` | Add a page to a book's summary. `--page` takes a page **id** (alias: `--page-id`), not a page number; `--position` is 0-based (`0` = top, omitted = last), like the position the summary shows back. Idempotent: repeating it never lists the page twice. |
+| `wikitech add [--file <path>\|-] [--source-label <text>] [--source-url <url>] [--source-published-at <iso8601>] [--link <url>…]` | Save an external tech notion (tool, library, open-source repo) to Wikitech. The body comes from `--file`, or from stdin with `--file -` or piped input. Body max 20000 characters, source label 120. Sending the same text with the same source again creates nothing: the output says it was already saved (`meta.duplicate` in `--json`). |
+| `wikitech search [query…] [--category <c>] [--verification verified\|unconfirmed] [--per] [--page]` | Search Wikitech entries (semantic when available, text fallback). Without a query, list them. |
+| `wikitech show <id>` | Show one Wikitech entry: summary, facts, repository data, links and sources. |
+| `wikitech ask <question…>` | Ask a tech question; the AI answers from the Wikitech entries and cites the ones it used, or says when they are not enough. |
 | `mcp [--timeout <seconds>]` | Serve the knowledge base over the Model Context Protocol on stdin/stdout, so any MCP-speaking assistant can search it, ask it, read pages and propose new ones with your own access. Started by the client as a subprocess — see [Connecting an assistant (MCP)](#connecting-an-assistant-mcp). |
 | `assistant ask <question…> [--conversation <id>] [--timeout <seconds>]` | Ask the assistant a question about your own data; it reads what you are allowed to see, answers, and lists the tools it used. Prints the conversation id so the next question can keep the context (`--conversation <id>`). |
 | `assistant conversations list [--per] [--page]` | List your conversations with the assistant, most recently active first. |
@@ -408,12 +419,30 @@ When a command fails in `--json` mode it exits non-zero and prints an error enve
 never a silent success:
 
 ```json
-{ "error": { "code": "C400-INP-001", "message": "Missing required flag project" } }
+{ "error": { "code": "C400-INP-001", "message": "Missing required flag project", "next_steps": ["cyi tickets show --help"] } }
 ```
 
 `C400-INP-001` means the command line itself needs fixing (missing flag or argument, unknown flag,
 missing `--confirm`) and `message` says what; `C500-SYS-001` is reserved for unexpected failures.
 Codes starting with `R`/`G` come straight from the backend.
+
+`next_steps` lists the commands to try next (list the projects after an unknown project key, log in,
+repeat with `--yes`, read the command help). It is present only when there is at least one. When the
+server sends its own suggestions they are passed through unchanged. Without `--json` the same commands
+are printed under the message, after `Try this:`.
+
+The exit code tells the kind of error, so a script does not need to read the message:
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Any other failure: network, server error, conflict, timeout |
+| `2` | Invalid input: bad flags or arguments, or data the server rejected (400/422) |
+| `3` | Confirmation required (`R422-CONFIRM-001`): re-run with `--yes` |
+| `4` | Access denied: not logged in, expired token, or missing permission (401/403) |
+| `5` | Not found (404) |
+
+`run` and `personal run` exit with the code of the program they ran. `kb doctor` exits 1 when a check fails.
 
 `C408-ASK-001` is not a failure: the AI answer did not arrive within `--timeout` and is still being
 worked on — `assistant ask` says which conversation to read it from once it lands. `C502-ASK-002`

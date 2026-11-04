@@ -218,13 +218,13 @@ describe('kb publish', () => {
   })
 
   it.each([
-    [401, 'R401-CLIAUTH-001'],
-    [403, 'R403-KNOWLEDGE-003'],
-    [409, 'R409-KNOWLEDGE-001'],
-  ])('propagates backend error %i %s', async (status, code) => {
+    [401, 'R401-CLIAUTH-001', 4],
+    [403, 'R403-KNOWLEDGE-003', 4],
+    [409, 'R409-KNOWLEDGE-001', 1],
+  ])('propagates backend error %i %s', async (status, code, exit) => {
     apiMock.put.mockRejectedValue(apiError(status, code, 'backend error', {field: ['invalid']}))
 
-    const {stderr} = await runExpectingExit(KbPublish, argv())
+    const {stderr} = await runExpectingExit(KbPublish, argv(), exit)
 
     expect(stderr).toContain(`${code}: backend error`)
   })
@@ -234,7 +234,7 @@ describe('kb publish', () => {
     const args = argv()
     args[KIND_VALUE] = 'unknown'
 
-    const {stderr} = await runExpectingExit(KbPublish, args)
+    const {stderr} = await runExpectingExit(KbPublish, args, 2)
 
     expect(apiMock.put).toHaveBeenCalledWith(PATH, expect.objectContaining({kind: 'unknown'}))
     expect(stderr).toContain('R422-KNOWLEDGE-005: kind is invalid')
@@ -243,7 +243,7 @@ describe('kb publish', () => {
   it('preserves R404-KNOWLEDGE-001 for a project that is not visible', async () => {
     apiMock.put.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-001', 'Project not found'))
 
-    const {stderr} = await runExpectingExit(KbPublish, argv())
+    const {stderr} = await runExpectingExit(KbPublish, argv(), 5)
 
     expect(stderr).toContain('R404-KNOWLEDGE-001: Project not found')
   })
@@ -253,7 +253,7 @@ describe('kb publish', () => {
 
     const args = argv()
     args[PROJECT_VALUE] = 'missing'
-    const {stderr} = await runExpectingExit(KbPublish, args)
+    const {stderr} = await runExpectingExit(KbPublish, args, 5)
 
     expect(stderr).toContain('C404-PRJ-001: Project not found: missing')
     expect(apiMock.put).not.toHaveBeenCalled()
@@ -282,7 +282,7 @@ describe('kb publish', () => {
   ])('leaves the application 404 %s untouched (%s)', async (code) => {
     apiMock.put.mockRejectedValue(apiError(404, code, 'Not found here'))
 
-    const {stderr} = await runExpectingExit(KbPublish, argv())
+    const {stderr} = await runExpectingExit(KbPublish, argv(), 5)
 
     expect(stderr).toContain(`${code}: Not found here`)
     expect(stderr).not.toContain(ErrorCodes.Knowledge.publishUnavailable)

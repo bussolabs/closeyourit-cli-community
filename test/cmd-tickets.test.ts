@@ -506,6 +506,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
     const {stderr} = await runExpectingExit(
       TicketsCreate,
       ['--project', PID, '--title', 'T', '--status', 'urgentissimo'],
+      5,
     )
     expect(stderr).toContain('C404-STA-001')
     expect(stderr).toContain('urgentissimo')
@@ -530,6 +531,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
     const {stderr} = await runExpectingExit(
       TicketsCreate,
       ['--project', PID, '--title', 'T', '--priority', 'Urgente'],
+      5,
     )
     expect(stderr).toContain('C404-PRI-001')
     expect(stderr).toContain('Urgente')
@@ -539,7 +541,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
 
   it('if the organization lacks the default status it says so, instead of letting the creation fail', async () => {
     mockLookups([{id: 'st-1', code: 'todo', label: 'Da fare'}])
-    const {stderr} = await runExpectingExit(TicketsCreate, ['--project', PID, '--title', 'T'])
+    const {stderr} = await runExpectingExit(TicketsCreate, ['--project', PID, '--title', 'T'], 5)
     expect(stderr).toContain('C404-STA-001')
     expect(stderr).toContain('open')
     expect(stderr).toContain('--status')
@@ -551,6 +553,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
     const {stderr: senzaElenco} = await runExpectingExit(
       TicketsCreate,
       ['--project', PID, '--title', 'T', '--status', 'open', '--priority', 'Solo etichetta'],
+      5,
     )
     expect(senzaElenco).toContain('C404-STA-001')
     expect(senzaElenco).not.toContain('known:')
@@ -558,6 +561,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
     const {stderr: conElenco} = await runExpectingExit(
       TicketsCreate,
       ['--project', PID, '--title', 'T', '--status', STATUS_UUID, '--priority', 'sconosciuta'],
+      5,
     )
     expect(conElenco).toContain('known: x, Solo etichetta')
   })
@@ -565,7 +569,7 @@ describe('tickets create — status and priority (CYCL-34)', () => {
   it('a lookup that does not answer with a list does not crash the command', async () => {
     apiMock.post.mockResolvedValue(envelope({code: 'DRRA-6'}))
     apiMock.get.mockResolvedValue(envelope({}))
-    const {stderr} = await runExpectingExit(TicketsCreate, ['--project', PID, '--title', 'T'])
+    const {stderr} = await runExpectingExit(TicketsCreate, ['--project', PID, '--title', 'T'], 5)
     expect(stderr).toContain('C404-STA-001')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
@@ -839,7 +843,7 @@ describe('tickets reject / approve (review decision)', () => {
 
   it('reject: API error R422-TICKET-006 → exit with message', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-TICKET-006', 'Il ticket non è in review.'))
-    await runExpectingExit(TicketsReject, [T, '--project', PID, '--reason', 'x'])
+    await runExpectingExit(TicketsReject, [T, '--project', PID, '--reason', 'x'], 2)
   })
 
   it('approve → POST review/approval without body', async () => {
@@ -944,7 +948,7 @@ describe('tickets comment / comments / comment-delete', () => {
         'The comment is over 240 characters (currently 300). For a long text use the work report.',
       ),
     )
-    const {stderr} = await runExpectingExit(TicketsComment, [T, '--project', 'CYCL', '--body', 'x'.repeat(300)])
+    const {stderr} = await runExpectingExit(TicketsComment, [T, '--project', 'CYCL', '--body', 'x'.repeat(300)], 2)
     expect(stderr).toContain('R422-COMMENT-002')
     expect(stderr).toContain('For a long text use the work report.')
     expect(stderr).toContain(`tickets report ${T} --project CYCL`)
@@ -965,7 +969,7 @@ describe('tickets comment / comments / comment-delete', () => {
 
   it('comment → a different rejection stays the server one, without hints (CYCL-31)', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-TICKET-001', 'Forbidden'))
-    const {stderr} = await runExpectingExit(TicketsComment, [T, '--project', PID, '--body', 'ciao'])
+    const {stderr} = await runExpectingExit(TicketsComment, [T, '--project', PID, '--body', 'ciao'], 4)
     expect(stderr).toContain('R403-TICKET-001: Forbidden')
     expect(stderr).not.toContain('tickets report')
   })
@@ -1077,7 +1081,7 @@ describe('tickets report — work report (CYCL-31)', () => {
 
   it('report-show → propagates the 404 of the ticket without a report', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-REPORT-001', 'This ticket has no work report yet.'))
-    const {stderr} = await runExpectingExit(TicketsReportShow, [T, '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsReportShow, [T, '--project', PID], 5)
     expect(stderr).toContain('R404-REPORT-001: This ticket has no work report yet.')
   })
 
@@ -1542,7 +1546,7 @@ describe('tickets lease renew', () => {
 
   it('renew → 404 (no lease to extend) propagated unchanged by BaseCommand.catch', async () => {
     apiMock.put.mockRejectedValue(apiError(404, 'R404-LEASE-002', 'No lease to renew'))
-    const {stderr} = await runExpectingExit(TicketsLeaseRenew, [T, '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsLeaseRenew, [T, '--project', PID], 5)
     expect(stderr).toContain('R404-LEASE-002: No lease to renew')
   })
 
@@ -1651,7 +1655,7 @@ describe('tickets lease release', () => {
 
   it('release → 404 (no lease to release) propagated unchanged', async () => {
     apiMock.delete.mockRejectedValue(apiError(404, 'R404-LEASE-002', 'No lease to release'))
-    const {stderr} = await runExpectingExit(TicketsLeaseRelease, [T, '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsLeaseRelease, [T, '--project', PID], 5)
     expect(stderr).toContain('R404-LEASE-002: No lease to release')
   })
 
@@ -1805,7 +1809,7 @@ describe('tickets work-context — the snapshot delivered at claim time (CYCL-47
     apiMock.get.mockRejectedValue(
       apiError(404, 'R404-TICKET-004', 'Il ticket non ha ancora uno snapshot del contesto di lavoro'),
     )
-    const {stderr} = await runExpectingExit(TicketsWorkContext, ['DRFL-3', '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsWorkContext, ['DRFL-3', '--project', PID], 5)
     expect(stderr).toContain('R404-TICKET-004')
     expect(stderr).toMatch(/no work context was captured/i)
     expect(stderr).toContain('DRFL-3')
@@ -1817,7 +1821,7 @@ describe('tickets work-context — the snapshot delivered at claim time (CYCL-47
     apiMock.get.mockRejectedValue(
       apiError(404, 'R404-TICKET-004', 'Il ticket non ha ancora uno snapshot del contesto di lavoro'),
     )
-    const {stderr} = await runExpectingExit(TicketsWorkContext, ['DRFL-3', '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsWorkContext, ['DRFL-3', '--project', PID], 5)
     expect(stderr).not.toMatch(/never been claimed/i)
     expect(stderr).toMatch(/manual claim/i)
   })
@@ -1839,7 +1843,7 @@ describe('tickets work-context — the snapshot delivered at claim time (CYCL-47
 
   it('without the audit permission: names the permission and does not fall back to the current guidance', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(TicketsWorkContext, [T, '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsWorkContext, [T, '--project', PID], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
     expect(stderr).toContain('tickets.audit.view')
     expect(apiMock.get).toHaveBeenCalledTimes(1)
@@ -1847,7 +1851,7 @@ describe('tickets work-context — the snapshot delivered at claim time (CYCL-47
 
   it('a different 404 (nonexistent ticket) passes with the server words', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-TICKET-001', 'Ticket non trovato'))
-    const {stderr} = await runExpectingExit(TicketsWorkContext, [T, '--project', PID])
+    const {stderr} = await runExpectingExit(TicketsWorkContext, [T, '--project', PID], 5)
     expect(stderr).toContain('R404-TICKET-001: Ticket non trovato')
     expect(stderr).not.toMatch(/no work context was captured/i)
   })

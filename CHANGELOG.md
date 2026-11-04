@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-04
+
+### Aggiunto
+
+- **Approvazioni dal terminale.** `approvals list` e `show` scaricano le richieste in attesa di una tua decisione. Puoi approvare, respingere, chiedere, rispondere o rimandare a domani, anche una alla volta con `approvals review`.
+
+## [0.38.0] - 2026-11-03
+
+### Modificato
+
+- **Gli errori dicono cosa provare dopo.** Sotto il messaggio, e in `next_steps` con `--json`, compaiono i comandi da provare. Il codice di uscita indica il tipo: 2 dato non valido, 3 conferma richiesta, 4 accesso negato, 5 non trovato, 1 il resto. Gli script che controllano solo `1` vanno aggiornati.
+
+## [0.37.0] - 2026-11-01
+
+### Aggiunto
+
+- **Comandi Wikitech.** `wikitech add` salva una nozione tecnica con fonte e link, da file o da standard input, senza creare doppioni. `wikitech search`, `show` e `ask` cercano, aprono e interrogano le schede. Tutti hanno `--json`.
+
 ## [0.36.0] - 2026-10-22
 
 ### Aggiunto

@@ -1,4 +1,4 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest'
+import {beforeAll, beforeEach, describe, expect, it, vi} from 'vitest'
 import {apiMock, resetApiMock} from './helpers/api-mock'
 import {PID, apiError, capture, envelope, run} from './helpers/command'
 
@@ -98,8 +98,10 @@ describe('--json mode surfaces API errors as an envelope, never swallows them', 
         },
         (err: unknown) => err,
       )
-      expect((error as {oclif?: {exit?: number}}).oclif?.exit).not.toBe(0)
-      expect(JSON.parse(cap.stdout())).toEqual({error: {code: 'C404-PRJ-001', message: 'Project not found: LBRA'}})
+      expect((error as {oclif?: {exit?: number}}).oclif?.exit).toBe(5)
+      expect(JSON.parse(cap.stdout())).toEqual({
+        error: {code: 'C404-PRJ-001', message: 'Project not found: LBRA', next_steps: ['cyi projects list']},
+      })
       expect(cap.stderr()).toBe('')
     } finally {
       cap.restore()
@@ -143,7 +145,11 @@ describe('--json mode says which input is missing, not "Command failed"', () => 
       )
       expect((error as {oclif?: {exit?: number}}).oclif?.exit).not.toBe(0)
       expect(cap.stderr()).toBe('')
-      return (JSON.parse(cap.stdout()) as {error: {code: string; message: string}}).error
+      const {next_steps: nextSteps, ...reported} = (JSON.parse(cap.stdout()) as {error: {code: string; message: string; next_steps?: string[]}}).error
+      // CYCL-82 — a rejected command line points at its help; a real failure suggests nothing.
+      if (reported.code === 'C400-INP-001') expect(nextSteps).toEqual([expect.stringMatching(/^cyi .+ --help$/)])
+      else expect(nextSteps).toBeUndefined()
+      return reported
     } finally {
       cap.restore()
     }
@@ -233,5 +239,95 @@ describe('renderTable tolerates rows with missing fields (null-fallback branches
   it.each(projectScoped)('%s renders empty cells for a sparse row', async (_name, command) => {
     apiMock.get.mockResolvedValue(envelope([{}]))
     await expect(run(command, ['--project', PID])).resolves.toBeTruthy()
+  })
+})
+
+/**
+ * CYCL-82 — an error says which command to try next and exits with a code that names its kind, so an
+ * agent can recover without parsing the message: 2 invalid input, 3 confirmation required, 4 access
+ * denied, 5 not found, 1 anything else.
+ */
+describe('errors suggest the next command and exit with a code per kind', () => {
+  // Run straight from their class, commands get the class name as id ("ticketsshow"); the real CLI
+  // loads them with their oclif id, which is what the suggestions repeat.
+  beforeAll(() => {
+    Object.assign(TicketsShow, {id: 'tickets:show'})
+    Object.assign(TicketsDelete, {id: 'tickets:delete'})
+  })
+
+  type Failure = {exit?: number; stdout: string; stderr: string; error: unknown}
+
+  const fail = async (command: Parameters<typeof run>[0], argv: string[]): Promise<Failure> => {
+    const cap = capture()
+    try {
+      const error = await run(command, argv).then(
+        () => {
+          throw new Error('expected a non-zero exit, but the command resolved')
+        },
+        (err: unknown) => err,
+      )
+      return {exit: (error as {oclif?: {exit?: number}}).oclif?.exit, stdout: cap.stdout(), stderr: cap.stderr(), error}
+    } finally {
+      cap.restore()
+    }
+  }
+
+  it('an unknown project key suggests listing the projects and exits 5, in both modes', async () => {
+    apiMock.get.mockResolvedValue(envelope([{id: PID, key: 'DRFL'}], {total_pages: 1}))
+
+    const json = await fail(TicketsList, ['--project', 'NOPE', '--json'])
+    expect(json.exit).toBe(5)
+    expect(JSON.parse(json.stdout)).toEqual({
+      error: {code: 'C404-PRJ-001', message: 'Project not found: NOPE', next_steps: ['cyi projects list']},
+    })
+
+    const human = await fail(TicketsList, ['--project', 'NOPE'])
+    expect(human.exit).toBe(5)
+    expect(human.stderr).toBe('C404-PRJ-001: Project not found: NOPE\nTry this:\n  cyi projects list')
+  })
+
+  it('a forgotten flag suggests the command help and exits 2 in both modes', async () => {
+    const json = await fail(TicketsShow, ['CYCL-33', '--json'])
+    expect(json.exit).toBe(2)
+    expect(JSON.parse(json.stdout)).toEqual({
+      error: {code: 'C400-INP-001', message: 'Missing required flag project', next_steps: ['cyi tickets show --help']},
+    })
+
+    const human = await fail(TicketsShow, ['CYCL-33'])
+    expect(human.exit).toBe(2)
+    expect((human.error as {suggestions?: string[]}).suggestions).toEqual(['cyi tickets show --help'])
+  })
+
+  it('a dangerous action the server refuses suggests repeating it with --yes and exits 3', async () => {
+    apiMock.delete.mockRejectedValue(apiError(422, 'R422-CONFIRM-001', 'Dangerous action: confirm it'))
+    const json = await fail(TicketsDelete, ['t-1', '--project', PID, '--confirm', '--json'])
+    expect(json.exit).toBe(3)
+    expect(JSON.parse(json.stdout).error.next_steps).toEqual([`cyi tickets delete t-1 --project ${PID} --confirm --json --yes`])
+  })
+
+  it('a denied permission keeps the server error and exits 4, without an empty next_steps', async () => {
+    apiMock.get.mockRejectedValue(apiError(403, 'R403-AUTH-001', 'Permission denied'))
+    const json = await fail(TicketsList, ['--project', PID, '--json'])
+    expect(json.exit).toBe(4)
+    expect(JSON.parse(json.stdout)).toEqual({error: {code: 'R403-AUTH-001', message: 'Permission denied'}})
+  })
+
+  it('the next steps sent by the server arrive unchanged', async () => {
+    const error = apiError(404, 'C404-PRJ-001', 'Project not found: NOPE')
+    Object.assign(error, {nextSteps: ['cyi projects list --page 2']})
+    apiMock.get.mockRejectedValue(error)
+    const json = await fail(TicketsList, ['--project', PID, '--json'])
+    expect(JSON.parse(json.stdout).error.next_steps).toEqual(['cyi projects list --page 2'])
+  })
+
+  it('a failure without known next steps looks as today and exits 1', async () => {
+    apiMock.get.mockRejectedValue(apiError(500, 'C500-API-000', 'Internal Server Error'))
+    const json = await fail(TicketsList, ['--project', PID, '--json'])
+    expect(json.exit).toBe(1)
+    expect(JSON.parse(json.stdout)).toEqual({error: {code: 'C500-API-000', message: 'Internal Server Error'}})
+
+    const human = await fail(TicketsList, ['--project', PID])
+    expect(human.exit).toBe(1)
+    expect(human.stderr).toBe('C500-API-000: Internal Server Error')
   })
 })

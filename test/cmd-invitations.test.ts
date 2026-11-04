@@ -29,7 +29,7 @@ describe('invitations list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-INV-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(InvitationsList, [])
+    const {stderr} = await runExpectingExit(InvitationsList, [], 4)
     expect(stderr).toContain('R403-INV-001')
   })
 })

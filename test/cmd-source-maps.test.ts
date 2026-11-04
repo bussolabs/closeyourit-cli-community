@@ -43,16 +43,16 @@ describe('source map commands', () => {
 
   it('rejects local input before any API call without echoing file contents', async () => {
     const file = join(dir, 'bad.map'); await writeFile(file, 'privateSentinel')
-    const failure = await runExpectingExit(Upload, ['-p', PID, '--release', 'v1', '--generated-file', 'app.js', '--file', file, '--json'])
+    const failure = await runExpectingExit(Upload, ['-p', PID, '--release', 'v1', '--generated-file', 'app.js', '--file', file, '--json'], 2)
     expect(failure.stdout).not.toContain('privateSentinel')
     expect(failure.stdout).toContain('Invalid source map JSON')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
 
-  it.each([403, 409, 413, 422, 503])('propagates status %i without echoing upstream source diagnostics', async (status) => {
+  it.each([[403, 4], [409, 1], [413, 1], [422, 2], [503, 1]])('propagates status %i without echoing upstream source diagnostics', async (status, exit) => {
     const file = join(dir, 'app.map'); await writeFile(file, JSON.stringify({version: 3, sources: [], names: [], mappings: ''}))
     apiMock.post.mockRejectedValue(apiError(status, `R${status}-ARTIFACT-001`, 'privateSentinel', {source_map: 'privateSentinel'}))
-    const failure = await runExpectingExit(Upload, ['-p', PID, '--release', 'v1', '--generated-file', 'app.js', '--file', file, '--json'])
+    const failure = await runExpectingExit(Upload, ['-p', PID, '--release', 'v1', '--generated-file', 'app.js', '--file', file, '--json'], exit)
     expect(failure.stdout).toContain(`R${status}-ARTIFACT-001`)
     expect(failure.stdout).not.toContain('privateSentinel')
   })

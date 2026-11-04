@@ -94,7 +94,7 @@ describe('vault requests list', () => {
 
   it('missing permission → the server code arrives on stderr', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(VaultRequestsList, [])
+    const {stderr} = await runExpectingExit(VaultRequestsList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -125,7 +125,7 @@ describe('vault requests approve', () => {
     apiMock.post.mockRejectedValue(
       apiError(403, 'R403-CHANGEREQUEST-001', 'Non puoi decidere la tua stessa richiesta'),
     )
-    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID])
+    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID], 4)
     expect(stderr).toContain('R403-CHANGEREQUEST-001')
     expect(stderr).toContain('Non puoi decidere la tua stessa richiesta')
     expect(stderr).toMatch(/someone else/i)
@@ -136,7 +136,7 @@ describe('vault requests approve', () => {
     apiMock.post.mockRejectedValue(
       apiError(403, 'R403-CHANGEREQUEST-003', 'Solo una persona può approvare o rifiutare'),
     )
-    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID])
+    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID], 4)
     expect(stderr).toContain('R403-CHANGEREQUEST-003')
     expect(stderr).toMatch(/person/i)
     expect(stderr).toMatch(/service account/i)
@@ -154,14 +154,14 @@ describe('vault requests approve', () => {
 
   it('nonexistent request or outside the visible projects → the server code passes through whole', async () => {
     apiMock.post.mockRejectedValue(apiError(404, 'R404-SYSTEM-001', 'Risorsa non trovata'))
-    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID])
+    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID], 5)
     expect(stderr).toContain('R404-SYSTEM-001')
     expect(stderr).toContain('Risorsa non trovata')
   })
 
   it('missing manage permission → the server code arrives whole, without invented explanations', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID])
+    const {stderr} = await runExpectingExit(VaultRequestsApprove, [MID], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
     expect(stderr).not.toMatch(/someone else/i)
   })
@@ -202,7 +202,7 @@ describe('vault requests reject', () => {
     apiMock.post.mockRejectedValue(
       apiError(422, 'R422-CHANGEREQUEST-001', 'Il motivo del rifiuto è obbligatorio'),
     )
-    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'])
+    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'], 2)
     expect(stderr).toContain('R422-CHANGEREQUEST-001')
     expect(stderr).toMatch(/reason/i)
   })
@@ -211,7 +211,7 @@ describe('vault requests reject', () => {
     apiMock.post.mockRejectedValue(
       apiError(403, 'R403-CHANGEREQUEST-001', 'Non puoi decidere la tua stessa richiesta'),
     )
-    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'])
+    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'], 4)
     expect(stderr).toContain('R403-CHANGEREQUEST-001')
     expect(stderr).toMatch(/someone else/i)
   })
@@ -220,7 +220,7 @@ describe('vault requests reject', () => {
     apiMock.post.mockRejectedValue(
       apiError(403, 'R403-CHANGEREQUEST-003', 'Solo una persona può approvare o rifiutare'),
     )
-    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'])
+    const {stderr} = await runExpectingExit(VaultRequestsReject, [MID, '--reason', 'no'], 4)
     expect(stderr).toMatch(/person/i)
   })
 

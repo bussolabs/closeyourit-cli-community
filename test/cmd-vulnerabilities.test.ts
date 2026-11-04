@@ -77,7 +77,7 @@ describe('vulnerabilities list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(VulnerabilitiesList, [])
+    const {stderr} = await runExpectingExit(VulnerabilitiesList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -119,7 +119,7 @@ describe('vulnerabilities triage', () => {
 
   it('promoting twice surfaces the server-side idempotency error', async () => {
     apiMock.put.mockRejectedValue(apiError(422, 'R422-VULN-001', 'already promoted'))
-    const {stderr} = await runExpectingExit(VulnerabilitiesPromote, [FINDING])
+    const {stderr} = await runExpectingExit(VulnerabilitiesPromote, [FINDING], 2)
     expect(stderr).toContain('R422-VULN-001')
   })
 
@@ -132,7 +132,7 @@ describe('vulnerabilities triage', () => {
 
   it('triage without the permission exits non-zero', async () => {
     apiMock.put.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(VulnerabilitiesIgnore, [FINDING])
+    const {stderr} = await runExpectingExit(VulnerabilitiesIgnore, [FINDING], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

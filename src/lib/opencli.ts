@@ -120,11 +120,14 @@ const GLOBAL_OPTIONS: OpenCliOption[] = [
   {name: '--json', description: 'Format output as json.', recursive: true},
 ]
 
-// CLI exit codes: a stable convention, shared by all commands.
+// CLI exit codes: a stable convention, shared by all commands (CYCL-82, `errors/exit-codes`).
 const EXIT_CODES: OpenCliExitCode[] = [
   {code: 0, description: 'Success'},
-  {code: 1, description: 'Runtime or API error'},
-  {code: 2, description: 'Invalid usage (bad flags/arguments)'},
+  {code: 1, description: 'Runtime, network or server error'},
+  {code: 2, description: 'Invalid input: bad flags/arguments, or data the server rejected'},
+  {code: 3, description: 'Confirmation required: re-run with --yes'},
+  {code: 4, description: 'Access denied: not logged in, or missing permission'},
+  {code: 5, description: 'Not found'},
 ]
 
 const upper = (name: string): string => name.toUpperCase()

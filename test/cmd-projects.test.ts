@@ -143,7 +143,7 @@ describe('projects show', () => {
 
   it('exits C404 when the key matches no project on any page', async () => {
     apiMock.get.mockResolvedValue(envelope([{id: 'other', key: 'XX'}]))
-    const {stderr} = await runExpectingExit(ProjectsShow, ['nope'])
+    const {stderr} = await runExpectingExit(ProjectsShow, ['nope'], 5)
     expect(stderr).toContain('C404-PRJ-001')
   })
 
@@ -255,7 +255,7 @@ describe('projects set-environment-capabilities', () => {
     apiMock.put.mockRejectedValue(apiError(404, 'R404-SYSTEM-001', 'not found'))
     const {stderr} = await runExpectingExit(ProjectsSetEnvironmentCapabilities, [
       '--project', PID, '--environment', 'nope', '--uptime', 'off',
-    ])
+    ], 5)
     expect(stderr).toContain('R404-SYSTEM-001')
   })
 })

@@ -57,7 +57,7 @@ describe('analytics show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-ANALYTICS-001', 'not found'))
-    const {stderr} = await runExpectingExit(AnalyticsShow, ['--project', PID])
+    const {stderr} = await runExpectingExit(AnalyticsShow, ['--project', PID], 5)
     expect(stderr).toContain('R404-ANALYTICS-001')
   })
 })

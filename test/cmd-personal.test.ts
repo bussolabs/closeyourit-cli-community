@@ -15,7 +15,9 @@ vi.mock('node:fs/promises', () => ({readFile: vi.fn()}))
 vi.mock('../src/lib/private-file', () => ({writePrivateFile: vi.fn()}))
 vi.mock('../src/lib/stdin', () => ({readStream: vi.fn()}))
 vi.mock('../src/lib/subprocess', () => ({runCommand: vi.fn()}))
+vi.mock('../src/lib/secret-value', () => ({readSecretValue: vi.fn()}))
 
+import {readSecretValue} from '../src/lib/secret-value'
 import {readFile} from 'node:fs/promises'
 import {writePrivateFile} from '../src/lib/private-file'
 import {readStream} from '../src/lib/stdin'
@@ -48,14 +50,24 @@ describe('personal set', () => {
     expect(apiMock.post).toHaveBeenCalledWith(base, {name: 'API_KEY', value: 's3cr3t', description: 'Stripe'})
   })
 
-  it('without a value exits non-zero', async () => {
+  it('with only NAME reads the value from the hidden prompt or stdin, never from argv', async () => {
+    vi.mocked(readSecretValue).mockResolvedValue('s3cr3t')
+    apiMock.post.mockResolvedValue(envelope({name: 'API_KEY'}))
+    await runCaptured(PersonalSet, ['API_KEY'])
+    expect(readSecretValue).toHaveBeenCalledWith('API_KEY')
+    expect(apiMock.post).toHaveBeenCalledWith(base, {name: 'API_KEY', value: 's3cr3t', description: undefined})
+  })
+
+  it('without a value exits non-zero, before the call', async () => {
+    vi.mocked(readSecretValue).mockRejectedValue(new Error('No value entered'))
     const {message} = await runExpectingExit(PersonalSet, ['API_KEY'])
-    expect(message).toContain('value')
+    expect(message).toContain('No value entered')
+    expect(apiMock.post).not.toHaveBeenCalled()
   })
 
   it('propagates the API error with a non-zero exit', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(PersonalSet, ['X=1'])
+    const {stderr} = await runExpectingExit(PersonalSet, ['X=1'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 

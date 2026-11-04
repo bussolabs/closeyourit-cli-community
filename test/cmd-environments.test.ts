@@ -63,7 +63,7 @@ describe('environments list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-ENV-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(EnvironmentsList, [])
+    const {stderr} = await runExpectingExit(EnvironmentsList, [], 4)
     expect(stderr).toContain('R403-ENV-001')
   })
 })

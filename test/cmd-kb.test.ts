@@ -213,7 +213,7 @@ describe('kb show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-002', 'not found'))
-    const {stderr} = await runExpectingExit(KbShow, [ID])
+    const {stderr} = await runExpectingExit(KbShow, [ID], 5)
     expect(stderr).toContain('R404-KNOWLEDGE-002')
   })
 })
@@ -347,7 +347,7 @@ describe('kb update', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-KNOWLEDGE-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(KbUpdate, [ID, '--title', 'X'])
+    const {stderr} = await runExpectingExit(KbUpdate, [ID, '--title', 'X'], 4)
     expect(stderr).toContain('R403-KNOWLEDGE-001')
   })
 
@@ -700,7 +700,7 @@ describe('proposal review (CYCL-17)', () => {
 
     it('propagates the server error when the page is not accepted yet', async () => {
       apiMock.post.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-009', 'Questa pagina non è ancora stata accettata.'))
-      const {message} = await runExpectingExit(KbConsolidate, [ID, '--path', 'global/git.md'], 1)
+      const {message} = await runExpectingExit(KbConsolidate, [ID, '--path', 'global/git.md'], 2)
       expect(message).toContain('R422-KNOWLEDGE-009')
     })
   })
@@ -846,7 +846,7 @@ describe('scopes, tags and author origin (CYCL-45)', () => {
 
     it('exits non-zero when a group does not exist, without creating the page', async () => {
       apiMock.get.mockResolvedValue(envelope([{id: GID, name: 'Piattaforma'}], {total_pages: 1}))
-      const {stderr} = await runExpectingExit(KbCreate, ['--project', PID, '--group', 'Fantasma', '--title', 'X', '--body', 'b'])
+      const {stderr} = await runExpectingExit(KbCreate, ['--project', PID, '--group', 'Fantasma', '--title', 'X', '--body', 'b'], 5)
       expect(stderr).toContain('Group not found: Fantasma')
       expect(apiMock.post).not.toHaveBeenCalled()
     })

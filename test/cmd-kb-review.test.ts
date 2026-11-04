@@ -38,7 +38,7 @@ describe('kb approve', () => {
 
   it('a decision rejected by the server exits with its code', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-009', 'bocciata dal revisore'))
-    const {stderr} = await runExpectingExit(KbApprove, [ID], 1)
+    const {stderr} = await runExpectingExit(KbApprove, [ID], 2)
     expect(stderr).toContain('R422-KNOWLEDGE-009: bocciata dal revisore')
   })
 })
@@ -72,7 +72,7 @@ describe('automatic reviewer rejection (R422-KNOWLEDGE-013)', () => {
 
   it('prints all violated rules, the format and the suggestions, not just the message', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-013', 'La pagina non rispetta le regole: T01 — …', details))
-    const {stderr} = await runExpectingExit(KbCreate, args, 1)
+    const {stderr} = await runExpectingExit(KbCreate, args, 2)
     expect(stderr).toContain('R422-KNOWLEDGE-013:')
     expect(stderr).toContain('T01: Il sintomo non cita il messaggio esatto.')
     expect(stderr).toContain('P05_missing (warning): Manca la parte 2.')
@@ -84,13 +84,13 @@ describe('automatic reviewer rejection (R422-KNOWLEDGE-013)', () => {
 
   it('with --json the details travel in the envelope', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-013', 'no', details))
-    const {stdout} = await runExpectingExit(KbCreate, [...args, '--json'], 1)
+    const {stdout} = await runExpectingExit(KbCreate, [...args, '--json'], 2)
     expect(JSON.parse(stdout)).toEqual({error: {code: 'R422-KNOWLEDGE-013', message: 'no', details}})
   })
 
   it('another error without details stays a single line', async () => {
     apiMock.post.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-001', 'Progetto non trovato.'))
-    const {stderr} = await runExpectingExit(KbCreate, args, 1)
+    const {stderr} = await runExpectingExit(KbCreate, args, 5)
     expect(stderr.trim().split('\n')).toHaveLength(1)
   })
 })

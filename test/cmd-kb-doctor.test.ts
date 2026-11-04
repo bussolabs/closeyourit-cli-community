@@ -163,7 +163,7 @@ describe('kb doctor — scan scope and cap', () => {
 
   it('an unreachable service exits with its code', async () => {
     apiMock.get.mockRejectedValue(apiError(401, 'R401-AUTH-001', 'token scaduto'))
-    const {stderr} = await runExpectingExit(KbDoctor, [], 1)
+    const {stderr} = await runExpectingExit(KbDoctor, [], 4)
     expect(stderr).toContain('R401-AUTH-001: token scaduto')
   })
 })

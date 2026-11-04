@@ -47,7 +47,7 @@ describe('roles list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-ROL-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(RolesList, [])
+    const {stderr} = await runExpectingExit(RolesList, [], 4)
     expect(stderr).toContain('R403-ROL-001')
   })
 })
@@ -65,7 +65,7 @@ describe('roles show', () => {
 
   it('exits C404 when the name matches no role', async () => {
     apiMock.get.mockResolvedValue(envelope([{id: RID, name: 'Client'}]))
-    const {stderr} = await runExpectingExit(RolesShow, ['Ghost'])
+    const {stderr} = await runExpectingExit(RolesShow, ['Ghost'], 5)
     expect(stderr).toContain('C404-ROL-001')
   })
 })

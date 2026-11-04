@@ -68,6 +68,12 @@ export const ErrorCodes = {
   TicketPriority: {
     notFound: 'C404-PRI-001',
   },
+  // An approval given by ticket code ("CYRA-12") that matches no card in the queue, or more than one
+  // (a ticket can wait for a plan approval and a review at once): pass the key instead (CYCL-85).
+  Approval: {
+    notFound: 'C404-APR-001',
+    ambiguous: 'C409-APR-002',
+  },
   Device: {
     expired: 'C408-DEV-001',
     failed: 'C400-DEV-002',

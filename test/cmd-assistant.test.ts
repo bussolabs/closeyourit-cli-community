@@ -353,7 +353,7 @@ describe('assistant ask', () => {
       .mockRejectedValueOnce(apiError(422, 'R422-ASSISTANT-004', 'Message too long'))
     apiMock.delete.mockResolvedValue(envelope(null))
 
-    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao'])
+    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao'], 2)
 
     expect(stderr).toContain('R422-ASSISTANT-004')
     expect(apiMock.delete).toHaveBeenCalledWith(`/cli/v1/assistant/conversations/${CID}`)
@@ -362,7 +362,7 @@ describe('assistant ask', () => {
   it('does not touch an existing conversation when the question is rejected', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-ASSISTANT-001', 'Blank'))
 
-    await runExpectingExit(AssistantAsk, ['ciao', '--conversation', CID])
+    await runExpectingExit(AssistantAsk, ['ciao', '--conversation', CID], 2)
 
     expect(apiMock.delete).not.toHaveBeenCalled()
   })
@@ -373,7 +373,7 @@ describe('assistant ask', () => {
       .mockRejectedValueOnce(apiError(422, 'R422-ASSISTANT-004', 'Message too long'))
     apiMock.delete.mockRejectedValue(apiError(500, 'R500-SYS-001', 'boom'))
 
-    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao'])
+    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao'], 2)
 
     expect(stderr).toContain('R422-ASSISTANT-004')
     expect(stderr).not.toContain('R500-SYS-001')
@@ -391,7 +391,7 @@ describe('assistant ask', () => {
   it('propagates the server rejection (question too long) without waiting for anything', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-ASSISTANT-004', 'Message too long'))
 
-    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao', '--conversation', CID])
+    const {stderr} = await runExpectingExit(AssistantAsk, ['ciao', '--conversation', CID], 2)
 
     expect(stderr).toContain('R422-ASSISTANT-004')
     expect(apiMock.get).not.toHaveBeenCalled()

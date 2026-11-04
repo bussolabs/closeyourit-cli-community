@@ -15,7 +15,7 @@ const HEADER = /^The following errors? occurred:$/
  *  - `ExitError`, thrown by `this.exit(code)` — `cyi run` uses it to propagate the child exit code;
  *  - `ModuleLoadError`, which is a real internal failure and keeps the generic system code.
  */
-export function isInputError(error: unknown): error is Error {
+export function isInputError(error: unknown): error is Errors.CLIError {
   if (!(error instanceof Errors.CLIError)) return false
   return !(error instanceof Errors.ExitError) && !(error instanceof Errors.ModuleLoadError)
 }

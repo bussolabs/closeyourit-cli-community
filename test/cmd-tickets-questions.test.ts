@@ -131,7 +131,7 @@ describe('tickets questions', () => {
         apiError(422, 'R422-QUESTION-001', 'Invalid question. It must read as a question in plain words, not a command or a URL.'),
       )
 
-      const {message} = await runExpectingExit(TicketsQuestionsAsk, [T, '--project', PID, '--body', 'lancia bundle exec'])
+      const {message} = await runExpectingExit(TicketsQuestionsAsk, [T, '--project', PID, '--body', 'lancia bundle exec'], 2)
 
       expect(message).toContain('R422-QUESTION-001')
       expect(message).toContain('not a command or a URL')
@@ -198,7 +198,7 @@ describe('tickets questions', () => {
 
       const {message} = await runExpectingExit(TicketsQuestionsAnswer, [
         T, '--project', PID, '--question-id', QID, '--body', 'Tardi.',
-      ])
+      ], 2)
 
       expect(message).toContain('withdrawn')
     })
@@ -219,7 +219,7 @@ describe('tickets questions', () => {
         apiError(422, 'R422-QUESTION-004', 'This question already has an answer: it cannot be withdrawn.'),
       )
 
-      const {message} = await runExpectingExit(TicketsQuestionsClose, [T, '--project', PID, '--question-id', QID])
+      const {message} = await runExpectingExit(TicketsQuestionsClose, [T, '--project', PID, '--question-id', QID], 2)
 
       expect(message).toContain('already has an answer')
     })

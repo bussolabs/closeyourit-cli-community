@@ -60,7 +60,7 @@ export default class TicketsComment extends BaseCommand {
   protected async catch(error: Interfaces.CommandError): Promise<unknown> {
     if (error instanceof ApiRequestError && error.code === COMMENT_TOO_LONG && this.target) {
       const hint = `Write it with: ${this.config.bin} tickets report ${this.target.id} --project ${this.target.project} --body-file <file>`
-      return super.catch(new ApiRequestError(error.status, error.code, `${error.message} ${hint}`, error.details))
+      return super.catch(new ApiRequestError(error.status, error.code, `${error.message} ${hint}`, error.details, error.nextSteps))
     }
 
     return super.catch(error)

@@ -82,7 +82,7 @@ describe('metrics bulk-triage', () => {
     apiMock.post.mockResolvedValue(envelope([{id: 'mg-1', kind: 'sql', name: 'SELECT users', status: 'ignored'}]))
     const {message} = await runExpectingExit(MetricsBulkTriage, [
       '--project', PID, '--action', 'ignore', '--group', 'mg-1', '--group', 'mg-ALTRO',
-    ])
+    ], 5)
     expect(message).toContain('C404-MTG-001')
     expect(message).toContain('mg-ALTRO')
   })
@@ -105,7 +105,7 @@ describe('metrics bulk-triage', () => {
     apiMock.post.mockResolvedValue({data: undefined})
     const {message} = await runExpectingExit(MetricsBulkTriage, [
       '--project', PID, '--action', 'resolve', '--group', 'mg-1',
-    ])
+    ], 5)
     expect(message).toContain('C404-MTG-001')
   })
 
@@ -113,7 +113,7 @@ describe('metrics bulk-triage', () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-PERM-001', 'forbidden'))
     const {stderr} = await runExpectingExit(MetricsBulkTriage, [
       '--project', PID, '--action', 'resolve', '--group', 'mg-1',
-    ])
+    ], 4)
     expect(stderr).toContain('R403-PERM-001')
   })
 })

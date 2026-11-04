@@ -32,7 +32,7 @@ describe('members list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-MBR-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(MembersList, [])
+    const {stderr} = await runExpectingExit(MembersList, [], 4)
     expect(stderr).toContain('R403-MBR-001')
   })
 })
@@ -138,7 +138,7 @@ describe('members update', () => {
 
   it('exits non-zero on an API error (protected target)', async () => {
     apiMock.put.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(MembersUpdate, [MEMBERSHIP, '--name', 'x'])
+    const {stderr} = await runExpectingExit(MembersUpdate, [MEMBERSHIP, '--name', 'x'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

@@ -116,7 +116,7 @@ describe('seo list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(SeoList, [])
+    const {stderr} = await runExpectingExit(SeoList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -174,7 +174,7 @@ describe('seo triage', () => {
 
   it('promoting twice surfaces the server-side idempotency error', async () => {
     apiMock.put.mockRejectedValue(apiError(422, 'R422-SEO-001', 'already promoted'))
-    const {stderr} = await runExpectingExit(SeoPromote, [ISSUE])
+    const {stderr} = await runExpectingExit(SeoPromote, [ISSUE], 2)
     expect(stderr).toContain('R422-SEO-001')
   })
 
@@ -230,7 +230,7 @@ describe('seo-sites', () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-SEO-002', 'base_url must be public'))
     const {stderr} = await runExpectingExit(SeoSitesCreate, [
       '--project', PID, '--url', 'http://192.168.1.10', '--environment', 'env-1',
-    ])
+    ], 2)
     expect(stderr).toContain('R422-SEO-002')
   })
 
@@ -360,7 +360,7 @@ describe('seo-sites show', () => {
 
   it('a site that does not exist exits with the server code', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-SEO-003', 'site not found'))
-    const {stderr} = await runExpectingExit(SeoSitesShow, ['ss-nope'])
+    const {stderr} = await runExpectingExit(SeoSitesShow, ['ss-nope'], 5)
     expect(stderr).toContain('R404-SEO-003')
   })
 })

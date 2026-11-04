@@ -40,15 +40,15 @@ describe('Native symbol artifact commands', () => {
   it('requires debug UUID before touching upload and refuses invalid local contents', async () => {
     await runExpectingExit(Upload, ['-p', PID, '--file', file, '--format', 'macho', '--architecture', 'arm64'], 2)
     await writeFile(file, '')
-    const result = await runExpectingExit(Upload, [...args(), '--json'])
+    const result = await runExpectingExit(Upload, [...args(), '--json'], 2)
     expect(result.stdout).not.toContain('privateSentinel')
     expect(result.stdout).toContain('nonempty')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
 
-  it.each([403, 409, 413, 422, 503])('preserves status %i code without exposing remote binary diagnostics', async (status) => {
+  it.each([[403, 4], [409, 1], [413, 1], [422, 2], [503, 1]])('preserves status %i code without exposing remote binary diagnostics', async (status, exit) => {
     apiMock.post.mockRejectedValue(apiError(status, `R${status}-ARTIFACT-001`, object_base64, {object_base64}))
-    const failure = await runExpectingExit(Upload, [...args(), '--json'])
+    const failure = await runExpectingExit(Upload, [...args(), '--json'], exit)
     expect(failure.stdout).toContain(`R${status}-ARTIFACT-001`)
     expect(failure.stdout).not.toContain('privateSentinel')
     expect(failure.stdout).not.toContain(object_base64)

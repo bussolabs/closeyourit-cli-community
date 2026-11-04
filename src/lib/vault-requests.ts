@@ -124,5 +124,5 @@ export function describeDecisionError(error: unknown): unknown {
   if (!(error instanceof ApiRequestError)) return error
   const hint = DECISION_HINTS[error.code]
   if (!hint) return error
-  return new ApiRequestError(error.status, error.code, `${error.message}. ${hint}`, error.details)
+  return new ApiRequestError(error.status, error.code, `${error.message}. ${hint}`, error.details, error.nextSteps)
 }

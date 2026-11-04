@@ -1,6 +1,6 @@
 {
   "name": "@bussolabs/closeyourit-cli",
-  "version": "0.36.0",
+  "version": "0.39.0",
   "description": "CLI for CloseYourIt — manage org, errors, tokens and tickets with your user token",
   "publishConfig": {
     "access": "public"
@@ -42,6 +42,9 @@
       "@oclif/plugin-help"
     ],
     "topics": {
+      "approvals": {
+        "description": "Requests waiting for your decision: list, show, approve, reject, ask, reply, defer, or review them one by one"
+      },
       "artifacts": {
         "description": "Private build artifacts"
       },
@@ -179,6 +182,9 @@
       },
       "kb": {
         "description": "Knowledge base: pages (notes/decisions/guides), semantic search and AI ask"
+      },
+      "wikitech": {
+        "description": "Wikitech: external tech knowledge (tools, libraries, open-source repos), search and AI ask"
       },
       "kb:book": {
         "description": "Knowledge books: ordered collections of pages (summary, add a page)"

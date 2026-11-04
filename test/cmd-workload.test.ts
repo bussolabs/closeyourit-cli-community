@@ -115,7 +115,7 @@ describe('workload show', () => {
   // to reveal it exists) and the command must report that code, not mask it.
   it('surfaces the 404 an action of another team returns', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-CLI-001', 'Not found'))
-    const {stderr} = await runExpectingExit(WorkloadShow, [AID])
+    const {stderr} = await runExpectingExit(WorkloadShow, [AID], 5)
     expect(stderr).toContain('R404-CLI-001')
   })
 })
@@ -168,7 +168,7 @@ describe('workload create', () => {
   })
 
   it('refuses a ticket reference that is neither an id nor a code, without calling the server', async () => {
-    const {message} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'X', '--ticket', 'nope'], 1)
+    const {message} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'X', '--ticket', 'nope'], 5)
     expect(message).toContain('C404-TKT-001')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
@@ -178,7 +178,7 @@ describe('workload create', () => {
       if (path.startsWith('/cli/v1/projects?')) return envelope([{id: PID, key: 'DRFL'}], {total_pages: 1})
       return envelope({})
     })
-    const {message} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'X', '--ticket', 'DRFL-9'], 1)
+    const {message} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'X', '--ticket', 'DRFL-9'], 5)
     expect(message).toContain('C404-TKT-001')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
@@ -217,7 +217,7 @@ describe('workload create', () => {
   // an explanation the rejection would seem to concern the activity, not the list read for convenience.
   it('turns the 403 of the team lookup into the way out', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(WorkloadCreate, ['--team', 'Marketing', '--title', 'Fiera'])
+    const {stderr} = await runExpectingExit(WorkloadCreate, ['--team', 'Marketing', '--title', 'Fiera'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
     expect(stderr).toContain('pass the team id instead of its name')
     expect(apiMock.post).not.toHaveBeenCalled()
@@ -225,7 +225,7 @@ describe('workload create', () => {
 
   it('surfaces the 422 a team I do not belong to returns', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-WORKLOAD-001', 'Team must exist'))
-    const {stderr} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'Fiera'])
+    const {stderr} = await runExpectingExit(WorkloadCreate, ['--team', TID, '--title', 'Fiera'], 2)
     expect(stderr).toContain('R422-WORKLOAD-001')
   })
 })
@@ -273,7 +273,7 @@ describe('workload update', () => {
 
   it('surfaces the 404 an action of another team returns', async () => {
     apiMock.put.mockRejectedValue(apiError(404, 'R404-CLI-001', 'Not found'))
-    const {stderr} = await runExpectingExit(WorkloadUpdate, [AID, '--title', 'Mia'])
+    const {stderr} = await runExpectingExit(WorkloadUpdate, [AID, '--title', 'Mia'], 5)
     expect(stderr).toContain('R404-CLI-001')
   })
 })
@@ -328,14 +328,14 @@ describe('workload participant', () => {
 
   it('turns the 403 of the member lookup into the way out', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(WorkloadParticipantRemove, [AID, 'ada@acme.com'])
+    const {stderr} = await runExpectingExit(WorkloadParticipantRemove, [AID, 'ada@acme.com'], 4)
     expect(stderr).toContain('pass the account id instead of the email')
     expect(apiMock.delete).not.toHaveBeenCalled()
   })
 
   it('surfaces R422-WORKLOAD-002 when the person is not on the team', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-WORKLOAD-002', 'Account must be a member of the team'))
-    const {stderr} = await runExpectingExit(WorkloadParticipantAdd, [AID, MID])
+    const {stderr} = await runExpectingExit(WorkloadParticipantAdd, [AID, MID], 2)
     expect(stderr).toContain('R422-WORKLOAD-002')
   })
 
@@ -403,13 +403,13 @@ describe('workload promote', () => {
 
   it('surfaces R422-WORKLOAD-003 when the action already has a ticket', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-WORKLOAD-003', 'Already linked'))
-    const {stderr} = await runExpectingExit(WorkloadPromote, [AID, '--project', PID])
+    const {stderr} = await runExpectingExit(WorkloadPromote, [AID, '--project', PID], 2)
     expect(stderr).toContain('R422-WORKLOAD-003')
   })
 
   it('surfaces R404-WORKLOAD-001 when the project is not visible', async () => {
     apiMock.post.mockRejectedValue(apiError(404, 'R404-WORKLOAD-001', 'Project not found'))
-    const {stderr} = await runExpectingExit(WorkloadPromote, [AID, '--project', PID])
+    const {stderr} = await runExpectingExit(WorkloadPromote, [AID, '--project', PID], 5)
     expect(stderr).toContain('R404-WORKLOAD-001')
   })
 

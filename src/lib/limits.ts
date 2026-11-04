@@ -22,6 +22,9 @@ export const LENGTH_LIMITS = {
   pageBody: 4_000,
   techSpec: 1_500,
   reviewNote: 240,
+  /** Body and source label of a Wikitech note (`cyi wikitech add`). */
+  wikitechNoteBody: 20_000,
+  wikitechSourceLabel: 120,
 } as const
 
 /** A field to measure: the flag as the command user writes it, the value and its cap. */

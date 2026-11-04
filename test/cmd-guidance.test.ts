@@ -86,7 +86,7 @@ describe('guidance show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-PRJ-001', 'not found'))
-    const {stderr} = await runExpectingExit(GuidanceShow, ['--project', PID])
+    const {stderr} = await runExpectingExit(GuidanceShow, ['--project', PID], 5)
     expect(stderr).toContain('R404-PRJ-001')
   })
 })

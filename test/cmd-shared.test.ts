@@ -11,7 +11,9 @@ vi.mock('../src/lib/config', async (io) => {
   const actual = await io<typeof import('../src/lib/config')>()
   return {...actual, loadConfig: vi.fn(() => ({apiUrl: 'https://api.test', token: 'tok_test'}))}
 })
+vi.mock('../src/lib/secret-value', () => ({readSecretValue: vi.fn()}))
 
+import {readSecretValue} from '../src/lib/secret-value'
 import SharedDelete from '../src/commands/shared/delete'
 import SharedList from '../src/commands/shared/list'
 import SharedSet from '../src/commands/shared/set'
@@ -56,9 +58,18 @@ describe('shared set', () => {
     expect(apiMock.post).toHaveBeenCalledWith(base, expect.objectContaining({name: 'OPTIONAL', value: ''}))
   })
 
+  it('with only NAME reads the value from the hidden prompt or stdin, never from argv', async () => {
+    vi.mocked(readSecretValue).mockResolvedValue('s3cr3t')
+    apiMock.post.mockResolvedValue(envelope({name: 'API_KEY'}))
+    await runCaptured(SharedSet, ['API_KEY', '-e', 'production'])
+    expect(readSecretValue).toHaveBeenCalledWith('API_KEY')
+    expect(apiMock.post).toHaveBeenCalledWith(base, {environment: 'production', name: 'API_KEY', value: 's3cr3t', description: undefined})
+  })
+
   it('without a value exits non-zero, before the call', async () => {
+    vi.mocked(readSecretValue).mockRejectedValue(new Error('No value entered'))
     const {message} = await runExpectingExit(SharedSet, ['API_KEY', '-e', 'production'])
-    expect(message).toContain('value')
+    expect(message).toContain('No value entered')
     expect(apiMock.post).not.toHaveBeenCalled()
   })
 
@@ -74,14 +85,14 @@ describe('shared set', () => {
     apiMock.post.mockRejectedValue(
       apiError(422, 'R422-SHARED-001', 'environment richiesto o inesistente nell\'organizzazione'),
     )
-    const {stderr} = await runExpectingExit(SharedSet, ['API_KEY=1', '-e', 'nope'])
+    const {stderr} = await runExpectingExit(SharedSet, ['API_KEY=1', '-e', 'nope'], 2)
     expect(stderr).toContain('R422-SHARED-001')
     expect(stderr).toContain('inesistente nell\'organizzazione')
   })
 
   it('missing permission → the server code arrives on stderr', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(SharedSet, ['API_KEY=1', '-e', 'production'])
+    const {stderr} = await runExpectingExit(SharedSet, ['API_KEY=1', '-e', 'production'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -137,7 +148,7 @@ describe('shared list', () => {
 
   it('missing permission → the server code arrives on stderr', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(SharedList, [])
+    const {stderr} = await runExpectingExit(SharedList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -166,7 +177,7 @@ describe('shared delete', () => {
 
   it('nonexistent variable → the server code arrives on stderr', async () => {
     apiMock.delete.mockRejectedValue(apiError(404, 'R404-GEN-001', 'not found'))
-    const {stderr} = await runExpectingExit(SharedDelete, ['MISSING', '--confirm'])
+    const {stderr} = await runExpectingExit(SharedDelete, ['MISSING', '--confirm'], 5)
     expect(stderr).toContain('R404-GEN-001')
   })
 })

@@ -27,7 +27,7 @@ describe('org show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-ORG-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(OrgShow, [])
+    const {stderr} = await runExpectingExit(OrgShow, [], 4)
     expect(stderr).toContain('R403-ORG-001')
   })
 })

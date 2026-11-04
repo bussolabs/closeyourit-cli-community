@@ -35,7 +35,7 @@ describe('groups list / create', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-GRP-001', 'name taken'))
-    const {stderr} = await runExpectingExit(GroupsCreate, ['DriverOne'])
+    const {stderr} = await runExpectingExit(GroupsCreate, ['DriverOne'], 2)
     expect(stderr).toContain('R422-GRP-001')
   })
 })

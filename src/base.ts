@@ -4,6 +4,8 @@ import {type CliConfig, loadConfig} from './lib/config'
 import {ApiRequestError, CliApi} from './lib/api'
 import {paginationFooter} from './lib/output'
 import {ErrorCodes} from './errors/error-codes'
+import {ExitCodes, exitCodeFor} from './errors/exit-codes'
+import {nextStepsFor} from './errors/next-steps'
 import {inputErrorMessage, isInputError} from './errors/input-error'
 import {type TicketLookup, matchTicketLookup, ticketLookupErrorMessage} from './lib/ticket-lookup'
 import {UUID_RE, fetchLookupRows, resolveNamedId, resolveProjectId} from './lib/lookup'
@@ -199,6 +201,9 @@ export abstract class BaseCommand extends Command {
    * Surface API errors, then exit non-zero. In `--json` mode `logToStderr` is a no-op, so emit the
    * structured `{ error: { code, message } }` envelope on stdout instead — otherwise the failure is
    * swallowed (empty stdout, exit looks like a silent success) for machine consumers (CYCL-1).
+   *
+   * CYCL-82: the exit code names the kind of error (`exitCodeFor`) and the commands to try next go
+   * under the message, or in `next_steps` in `--json` — a field present only when there is one.
    */
   protected async catch(error: Interfaces.CommandError): Promise<unknown> {
     // CYCL-52 — `this.exit(n)` is a decision the command made, not a failure to report: whoever
@@ -208,24 +213,40 @@ export abstract class BaseCommand extends Command {
     if (isExitError(error)) throw error
 
     if (error instanceof ApiRequestError) {
+      const nextSteps = nextStepsFor(error, this.commandContext())
       if (this.jsonEnabled()) {
-        this.logJson({error: {code: error.code, message: error.message, ...(error.details === undefined ? {} : {details: error.details})}})
+        this.logJson({
+          error: {
+            code: error.code,
+            message: error.message,
+            ...(error.details === undefined ? {} : {details: error.details}),
+            ...(nextSteps.length === 0 ? {} : {next_steps: nextSteps}),
+          },
+        })
       } else {
         this.logToStderr(`${error.code}: ${error.message}`)
         for (const line of reviewVerdictLines(error)) this.logToStderr(line)
+        if (nextSteps.length > 0) this.logToStderr(['Try this:', ...nextSteps.map((step) => `  ${step}`)].join('\n'))
       }
-      return this.exit(1)
+      return this.exit(exitCodeFor(error))
     }
 
     // A rejected command line is not a server failure: oclif refuses it before the command body runs
     // (missing required flag/arg, nonexistent flag, value outside the options) and the `this.error(...)`
     // guards refuse it inside. Both used to collapse into the generic C500-SYS-001 "Command failed" in
     // --json, so a script could not tell a forgotten flag from an outage. Emit the same message the
-    // human mode prints, under a dedicated code (CYCL-33). Human mode is untouched: oclif keeps
-    // rendering its own error plus the usage help.
-    if (isInputError(error) && this.jsonEnabled()) {
-      this.logJson({error: {code: ErrorCodes.Input.invalid, message: inputErrorMessage(error)}})
-      return this.exit(1)
+    // human mode prints, under a dedicated code (CYCL-33). Human mode keeps oclif's own rendering,
+    // which prints `suggestions` as "Try this:". Both modes exit with the error's own code (2 unless a
+    // guard chose another), so a script sees the same exit either way (CYCL-82).
+    if (isInputError(error)) {
+      const nextSteps = nextStepsFor({status: 400, code: ErrorCodes.Input.invalid}, this.commandContext())
+      if (!this.jsonEnabled()) {
+        error.suggestions ??= nextSteps
+        return super.catch(error)
+      }
+
+      this.logJson({error: {code: ErrorCodes.Input.invalid, message: inputErrorMessage(error), next_steps: nextSteps}})
+      return this.exit(error.oclif?.exit ?? ExitCodes.invalidInput)
     }
 
     // Oclif's default JSON formatter serializes the complete CommandError. That object references
@@ -237,6 +258,11 @@ export abstract class BaseCommand extends Command {
     }
 
     return super.catch(error)
+  }
+
+  /** The failed command as a next step can repeat it: oclif id plus the arguments it was given. */
+  private commandContext(): {command: string; argv: string[]} {
+    return {command: this.id ?? '', argv: this.argv}
   }
 
   /**

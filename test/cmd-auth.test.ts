@@ -89,7 +89,7 @@ describe('whoami — fallbacks', () => {
     try {
       // whoami has no flags of its own: until CYCL-33 it never parsed, so the typo was ignored
       // and the identity was printed as if the command line had been right.
-      const {error, stdout} = await runExpectingExit(Whoami, ['--json', '--invalid-flag'])
+      const {error, stdout} = await runExpectingExit(Whoami, ['--json', '--invalid-flag'], 2)
       expect(stdout).toContain('C400-INP-001')
       expect(stdout).toContain('Nonexistent flag: --invalid-flag')
       expect(stdout).not.toContain(sentinel)
@@ -267,8 +267,10 @@ describe('logout', () => {
   })
 
   it('a nonexistent flag stops the command before deleting the credentials', async () => {
-    const {stdout} = await runExpectingExit(Logout, ['--json', '--nope'])
-    expect(JSON.parse(stdout)).toEqual({error: {code: 'C400-INP-001', message: 'Nonexistent flag: --nope'}})
+    const {stdout} = await runExpectingExit(Logout, ['--json', '--nope'], 2)
+    expect(JSON.parse(stdout)).toEqual({
+      error: {code: 'C400-INP-001', message: 'Nonexistent flag: --nope', next_steps: ['cyi logout --help']},
+    })
     expect(vi.mocked(clearToken)).not.toHaveBeenCalled()
   })
 })
@@ -298,7 +300,7 @@ describe('whoami', () => {
 
   it('exits non-zero and prints the code when the API errors', async () => {
     apiMock.get.mockRejectedValue(apiError(401, 'R401-AUTH-001', 'Not authenticated'))
-    const {stderr} = await runExpectingExit(Whoami, [])
+    const {stderr} = await runExpectingExit(Whoami, [], 4)
     expect(stderr).toContain('R401-AUTH-001')
     expect(stderr).toContain('Not authenticated')
   })

@@ -40,7 +40,7 @@ describe('errors grouping-rules list', () => {
 
   it('propagates a backend error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'C404-PRJ-001', 'Project not found'))
-    const {stderr} = await runExpectingExit(ErrorsGroupingRulesList, ['--project', PID])
+    const {stderr} = await runExpectingExit(ErrorsGroupingRulesList, ['--project', PID], 5)
     expect(stderr).toContain('C404-PRJ-001')
   })
 })
@@ -96,7 +96,7 @@ describe('errors grouping-rules create', () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-ERRGROUPRULE-001', 'Value non può essere vuoto'))
     const {stderr} = await runExpectingExit(ErrorsGroupingRulesCreate, [
       '--project', PID, '--field', 'message', '--operator', 'contains', '--value', ' ', '--fingerprint-key', 'k',
-    ])
+    ], 2)
     expect(stderr).toContain('R422-ERRGROUPRULE-001')
   })
 })

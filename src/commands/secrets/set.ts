@@ -1,22 +1,24 @@
 import {Args, Flags} from '@oclif/core'
 import {BaseCommand, environmentFlag, projectFlag} from '../../base'
+import {readSecretValue} from '../../lib/secret-value'
 
 export default class SecretsSet extends BaseCommand {
   static args = {
-    assignment: Args.string({description: 'NAME=VALUE, or just NAME with --value', required: true}),
+    assignment: Args.string({description: 'NAME (value asked hidden, or read from stdin); NAME=VALUE also works but stays in shell history', required: true}),
   }
 
   static description = 'Set (create or update) a secret for a project environment'
 
   static examples = [
-    '<%= config.bin %> secrets set -p acme-api -e production DATABASE_URL=postgres://user:pass@host/db',
+    '<%= config.bin %> secrets set -p acme-api -e production DATABASE_URL',
+    'pbpaste | <%= config.bin %> secrets set -p acme-api -e production DATABASE_URL',
     '<%= config.bin %> secrets set -p acme-api -e production API_KEY --value s3cr3t --description "Stripe key"',
   ]
 
   static flags = {
     ...projectFlag,
     ...environmentFlag,
-    value: Flags.string({description: 'Secret value (use when the arg is just NAME)'}),
+    value: Flags.string({description: 'Secret value (visible in shell history: prefer the prompt or stdin)'}),
     description: Flags.string({description: 'Optional description'}),
   }
 
@@ -26,10 +28,9 @@ export default class SecretsSet extends BaseCommand {
 
     const eq = args.assignment.indexOf('=')
     const name = eq === -1 ? args.assignment : args.assignment.slice(0, eq)
-    const value = eq === -1 ? flags.value : args.assignment.slice(eq + 1)
-    if (value === undefined) {
-      this.error('Provide a value: use NAME=VALUE or pass --value', {exit: 1})
-    }
+    const value =
+      (eq === -1 ? flags.value : args.assignment.slice(eq + 1)) ??
+      (await readSecretValue(name).catch((error: Error) => this.error(`${error.message}: type it at the prompt or pipe it via stdin`, {exit: 1})))
 
     const res = await this.api.post<Record<string, unknown>>(
       `/cli/v1/projects/${encodeURIComponent(projectId)}/secrets`,

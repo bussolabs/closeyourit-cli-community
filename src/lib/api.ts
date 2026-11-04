@@ -8,6 +8,8 @@ export class ApiRequestError extends Error {
     public readonly code: string,
     message: string,
     public readonly details?: unknown,
+    /** Commands to try next, as the server sent them (`next_steps`, CYCL-82); absent when it sent none. */
+    public readonly nextSteps?: string[],
   ) {
     super(message)
     this.name = 'ApiRequestError'
@@ -42,8 +44,12 @@ export interface UploadFile {
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-/** Error code the server answers when a dangerous write arrives without the confirm gesture (CYRA-728). */
-export const CONFIRMATION_REQUIRED_CODE = 'R422-CONFIRM-001'
+/** The server's `next_steps`, kept only when it is a list of commands; anything else is ignored. */
+function serverNextSteps(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const steps = value.filter((step): step is string => typeof step === 'string' && step.trim() !== '')
+  return steps.length > 0 ? steps : undefined
+}
 
 const READ_METHODS = new Set<HttpMethod>(['GET', 'HEAD', 'OPTIONS'] as HttpMethod[])
 
@@ -145,7 +151,7 @@ export class CliApi {
     const headers: Record<string, string> = {Accept: 'application/json'}
     if (auth) {
       if (!this.config.token) {
-        throw new ApiRequestError(401, ErrorCodes.Auth.notLoggedIn, 'Not logged in. Run "closeyourit login".')
+        throw new ApiRequestError(401, ErrorCodes.Auth.notLoggedIn, 'Not logged in. Run "cyi login".')
       }
       headers.Authorization = `Bearer ${this.config.token}`
     }
@@ -182,15 +188,12 @@ export class CliApi {
     }
 
     if (!res.ok) {
-      const envelope = (json ?? {}) as {error?: {code?: string; message?: string; details?: unknown}}
+      const envelope = (json ?? {}) as {error?: {code?: string; message?: string; details?: unknown; next_steps?: unknown}}
       const error = envelope.error ?? {}
-      let message = error.message ?? res.statusText ?? `Request failed (${res.status})`
-      // The server names the gesture it wants but not the flag that makes it: say it here, once.
-      if (error.code === CONFIRMATION_REQUIRED_CODE && !message.includes('--yes')) {
-        message = `${message} Re-run with --yes to confirm this dangerous action.`
-      }
-
-      throw new ApiRequestError(res.status, error.code ?? `C${res.status}-API-000`, message, error.details)
+      const message = error.message ?? res.statusText ?? `Request failed (${res.status})`
+      // A refused confirmation (R422-CONFIRM-001) gets its way out from the command, which suggests
+      // re-running itself with --yes as a next step (CYCL-82).
+      throw new ApiRequestError(res.status, error.code ?? `C${res.status}-API-000`, message, error.details, serverNextSteps(error.next_steps))
     }
 
     const envelope = (json ?? {}) as Envelope<T>

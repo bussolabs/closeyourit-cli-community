@@ -66,7 +66,7 @@ describe('matrix list / statuses', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(MatrixList, [])
+    const {stderr} = await runExpectingExit(MatrixList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

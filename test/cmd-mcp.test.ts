@@ -207,12 +207,22 @@ describe('scenario 3: the limits are those of the connecting token', () => {
   })
 
   it('without saved access says you are not logged in, as the command would', async () => {
-    apiMock.get.mockRejectedValue(apiError(401, 'C401-AUT-001', 'Not logged in. Run "closeyourit login".'))
+    apiMock.get.mockRejectedValue(apiError(401, 'C401-AUT-001', 'Not logged in. Run "cyi login".'))
     const [response] = await converse([
       {jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'kb_search', arguments: {query: 'x'}}},
     ])
     expect(response.result?.isError).toBe(true)
-    expect((response.result?.content as Array<{text: string}>)[0].text).toContain('closeyourit login')
+    expect((response.result?.content as Array<{text: string}>)[0].text).toContain('cyi login')
+  })
+
+  it('names the command to try next under the error (CYCL-82)', async () => {
+    apiMock.get.mockRejectedValue(apiError(404, 'C404-PRJ-001', 'Project not found: NOPE'))
+    const [response] = await converse([
+      {jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'kb_search', arguments: {query: 'x'}}},
+    ])
+    expect((response.result?.content as Array<{text: string}>)[0].text).toBe(
+      'C404-PRJ-001: Project not found: NOPE\nTry this:\n  cyi projects list',
+    )
   })
 })
 

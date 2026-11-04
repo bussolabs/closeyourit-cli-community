@@ -52,7 +52,7 @@ describe('releases list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-PROJECT-001', 'not found'))
-    const {stderr} = await runExpectingExit(ReleasesList, ['--project', PID])
+    const {stderr} = await runExpectingExit(ReleasesList, ['--project', PID], 5)
     expect(stderr).toContain('R404-PROJECT-001')
   })
 })

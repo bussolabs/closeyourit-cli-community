@@ -72,7 +72,7 @@ describe('logs show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-LOG-001', 'not found'))
-    const {stderr} = await runExpectingExit(LogsShow, [LOG])
+    const {stderr} = await runExpectingExit(LogsShow, [LOG], 5)
     expect(stderr).toContain('R404-LOG-001')
   })
 })

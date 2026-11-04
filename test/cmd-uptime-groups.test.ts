@@ -56,7 +56,7 @@ describe('uptime-groups list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'denied'))
-    const {stderr} = await runExpectingExit(UptimeGroupsList, [])
+    const {stderr} = await runExpectingExit(UptimeGroupsList, [], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

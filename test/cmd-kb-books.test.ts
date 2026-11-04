@@ -122,7 +122,7 @@ describe('kb book list', () => {
 
   it('exits non-zero when the requested project is not visible', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-KNOWLEDGE-001', 'Progetto non trovato'))
-    const {stderr} = await runExpectingExit(KbBookList, ['--project', 'segreto'])
+    const {stderr} = await runExpectingExit(KbBookList, ['--project', 'segreto'], 5)
     expect(stderr).toContain('R404-KNOWLEDGE-001')
   })
 
@@ -187,7 +187,7 @@ describe('kb book show', () => {
 
   it('exits non-zero when the book is not visible', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-SYS-001', 'Risorsa non trovata'))
-    const {stderr} = await runExpectingExit(KbBookShow, [BOOK])
+    const {stderr} = await runExpectingExit(KbBookShow, [BOOK], 5)
     expect(stderr).toContain('R404-SYS-001')
   })
 
@@ -268,20 +268,20 @@ describe('kb book add-page', () => {
     apiMock.post.mockRejectedValue(
       apiError(422, 'R422-KNOWLEDGE-007', 'Questa pagina appartiene già a un altro book.'),
     )
-    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE])
+    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE], 2)
     expect(message).toContain('R422-KNOWLEDGE-007')
     expect(message).toContain('altro book')
   })
 
   it('propagates the server rejection when the page does not belong to the book projects', async () => {
     apiMock.post.mockRejectedValue(apiError(422, 'R422-KNOWLEDGE-006', 'La pagina non è nei progetti del book.'))
-    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE])
+    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE], 2)
     expect(message).toContain('R422-KNOWLEDGE-006')
   })
 
   it('propagates the permission denied', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Permesso negato'))
-    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE])
+    const {message} = await runExpectingExit(KbBookAddPage, [BOOK, '--page', PAGE], 4)
     expect(message).toContain('R403-CLIAUTH-002')
   })
 

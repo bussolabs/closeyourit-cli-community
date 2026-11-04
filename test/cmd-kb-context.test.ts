@@ -138,7 +138,7 @@ describe('kb context — scenario 1: inside a project', () => {
 
   it('does not fall back on an error that is not a missing route', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-AUTH-001', 'Permesso negato'))
-    const {stderr} = await runExpectingExit(KbContext, ['--project', 'ACME'])
+    const {stderr} = await runExpectingExit(KbContext, ['--project', 'ACME'], 4)
     expect(apiMock.get).toHaveBeenCalledTimes(1)
     expect(stderr).toContain('R403-AUTH-001')
   })

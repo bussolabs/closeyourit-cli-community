@@ -1,5 +1,6 @@
 import type {Readable, Writable} from 'node:stream'
 import {ApiRequestError, type CliApi} from '../api'
+import {nextStepsFor} from '../../errors/next-steps'
 import {
   type JsonRpcId,
   type JsonRpcRequest,
@@ -90,8 +91,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * without having to guess.
  */
 function toolErrorText(error: unknown): string {
-  if (error instanceof ApiRequestError) return `${error.code}: ${error.message}`
-  return String((error as Error).message)
+  if (!(error instanceof ApiRequestError)) return String((error as Error).message)
+  // The commands to try next (CYCL-82), as the terminal prints them. There is no command to repeat
+  // here, so only the suggestions that stand on their own are given.
+  const nextSteps = nextStepsFor(error)
+  const lines = [`${error.code}: ${error.message}`]
+  if (nextSteps.length > 0) lines.push('Try this:', ...nextSteps.map((step) => `  ${step}`))
+  return lines.join('\n')
 }
 
 function initialize(params: Record<string, unknown>, session: McpSession): Record<string, unknown> {

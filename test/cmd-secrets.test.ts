@@ -14,7 +14,9 @@ vi.mock('../src/lib/config', async (io) => {
 vi.mock('node:fs/promises', () => ({readFile: vi.fn()}))
 vi.mock('../src/lib/private-file', () => ({writePrivateFile: vi.fn()}))
 vi.mock('../src/lib/stdin', () => ({readStream: vi.fn()}))
+vi.mock('../src/lib/secret-value', () => ({readSecretValue: vi.fn()}))
 
+import {readSecretValue} from '../src/lib/secret-value'
 import {readFile} from 'node:fs/promises'
 import {writePrivateFile} from '../src/lib/private-file'
 import {readStream} from '../src/lib/stdin'
@@ -58,14 +60,24 @@ describe('secrets set', () => {
     expect(stdout).not.toContain('used by')
   })
 
-  it('without a value exits non-zero', async () => {
+  it('with only NAME reads the value from the hidden prompt or stdin, never from argv', async () => {
+    vi.mocked(readSecretValue).mockResolvedValue('s3cr3t')
+    apiMock.post.mockResolvedValue(envelope({name: 'API_KEY'}))
+    await runCaptured(SecretsSet, ['API_KEY', '-p', PID, '-e', 'production'])
+    expect(readSecretValue).toHaveBeenCalledWith('API_KEY')
+    expect(apiMock.post).toHaveBeenCalledWith(`/cli/v1/projects/${PID}/secrets`, {environment: 'production', name: 'API_KEY', value: 's3cr3t', description: undefined})
+  })
+
+  it('without a value exits non-zero, before the call', async () => {
+    vi.mocked(readSecretValue).mockRejectedValue(new Error('No value entered'))
     const {message} = await runExpectingExit(SecretsSet, ['API_KEY', '-p', PID, '-e', 'production'])
-    expect(message).toContain('value')
+    expect(message).toContain('No value entered')
+    expect(apiMock.post).not.toHaveBeenCalled()
   })
 
   it('propagates the API error with a non-zero exit', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(SecretsSet, ['X=1', '-p', PID, '-e', 'production'])
+    const {stderr} = await runExpectingExit(SecretsSet, ['X=1', '-p', PID, '-e', 'production'], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })
@@ -232,7 +244,7 @@ describe('secrets sync', () => {
 
   it('propagates the API error with a non-zero exit', async () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'forbidden'))
-    const {stderr} = await runExpectingExit(SecretsSync, ['-p', PID])
+    const {stderr} = await runExpectingExit(SecretsSync, ['-p', PID], 4)
     expect(stderr).toContain('R403-CLIAUTH-002')
   })
 })

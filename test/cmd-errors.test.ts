@@ -59,7 +59,7 @@ describe('errors list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-ERR-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(ErrorsList, ['--project', PID])
+    const {stderr} = await runExpectingExit(ErrorsList, ['--project', PID], 4)
     expect(stderr).toContain('R403-ERR-001')
   })
 })
@@ -146,7 +146,7 @@ describe('errors bulk-triage', () => {
     apiMock.post.mockResolvedValue(envelope([{id: 'eg-1', title: 'Boom', status: 'resolved'}]))
     const {message} = await runExpectingExit(ErrorsBulkTriage, [
       '--project', PID, '--action', 'resolve', '--group', 'eg-1', '--group', 'eg-ALTRO',
-    ])
+    ], 5)
     expect(message).toContain('C404-ERG-001')
     expect(message).toContain('eg-ALTRO')
     expect(message).not.toContain('eg-1,')
@@ -194,7 +194,7 @@ describe('errors bulk-triage', () => {
     apiMock.post.mockResolvedValue({data: undefined})
     const {message} = await runExpectingExit(ErrorsBulkTriage, [
       '--project', PID, '--action', 'resolve', '--group', 'eg-1',
-    ])
+    ], 5)
     expect(message).toContain('C404-ERG-001')
   })
 
@@ -202,7 +202,7 @@ describe('errors bulk-triage', () => {
     apiMock.post.mockRejectedValue(apiError(403, 'R403-PERM-001', 'forbidden'))
     const {stderr} = await runExpectingExit(ErrorsBulkTriage, [
       '--project', PID, '--action', 'resolve', '--group', 'eg-1',
-    ])
+    ], 4)
     expect(stderr).toContain('R403-PERM-001')
   })
 })
@@ -232,7 +232,7 @@ describe('errors assign', () => {
   // the command would think they had given the error to someone.
   it("exits non-zero if the server did not apply the assignee", async () => {
     apiMock.patch.mockResolvedValue(envelope({id: GROUP, assignee: null}))
-    const {message} = await runExpectingExit(ErrorsAssign, [GROUP, '--project', PID, '--assignee', MID])
+    const {message} = await runExpectingExit(ErrorsAssign, [GROUP, '--project', PID, '--assignee', MID], 5)
     expect(message).toContain('C404-MBR-001')
     expect(message).toContain(MID)
   })
@@ -287,7 +287,7 @@ describe('errors merge', () => {
     )
     const {stderr} = await runExpectingExit(ErrorsMerge, [
       GROUP, '--project', PID, '--group', 'eg-9', '--confirm',
-    ])
+    ], 2)
     expect(stderr).toContain('R422-ERROR-004')
     expect(stderr).toContain('Nessuna fusione eseguita')
   })
@@ -320,7 +320,7 @@ describe('errors split', () => {
     apiMock.post.mockRejectedValue(
       apiError(422, 'R422-ERROR-006', 'Occorrenze non trovate in questo gruppo: ev-9. Nessuna divisione eseguita.'),
     )
-    const {stderr} = await runExpectingExit(ErrorsSplit, [GROUP, '--project', PID, '--event', 'ev-9'])
+    const {stderr} = await runExpectingExit(ErrorsSplit, [GROUP, '--project', PID, '--event', 'ev-9'], 2)
     expect(stderr).toContain('R422-ERROR-006')
   })
 })

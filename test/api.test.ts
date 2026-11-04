@@ -343,3 +343,28 @@ describe('CliApi — confirmation of dangerous actions (CYCL-53)', () => {
   })
 })
 
+
+describe('CliApi — next steps sent by the server (CYCL-82)', () => {
+  function failWith(error: Record<string, unknown>) {
+    vi.stubGlobal('fetch', vi.fn(async () => response({ok: false, status: 404, body: {error}})))
+    return new CliApi({apiUrl: 'https://api.test', token: 'tok'}).get('/cli/v1/projects/x')
+  }
+
+  it('carries next_steps unchanged on the error', async () => {
+    const error = await failWith({code: 'R404-PRJ-001', message: 'Not found', next_steps: ['cyi projects list']}).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiRequestError)
+    expect((error as ApiRequestError).nextSteps).toEqual(['cyi projects list'])
+  })
+
+  it('leaves the error as today when the server sends none', async () => {
+    const error = (await failWith({code: 'R404-PRJ-001', message: 'Not found'}).catch((e: unknown) => e)) as ApiRequestError
+    expect(error.nextSteps).toBeUndefined()
+  })
+
+  it('ignores next_steps that are not a list of commands', async () => {
+    const error = (await failWith({code: 'R404-PRJ-001', message: 'x', next_steps: 'cyi projects list'}).catch((e: unknown) => e)) as ApiRequestError
+    expect(error.nextSteps).toBeUndefined()
+    const mixed = (await failWith({code: 'R404-PRJ-001', message: 'x', next_steps: ['cyi projects list', 3, '']}).catch((e: unknown) => e)) as ApiRequestError
+    expect(mixed.nextSteps).toEqual(['cyi projects list'])
+  })
+})

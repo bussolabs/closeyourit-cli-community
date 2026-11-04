@@ -82,7 +82,7 @@ describe('monitors list / show', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(404, 'R404-MON-001', 'no such project'))
-    const {stderr} = await runExpectingExit(MonitorsList, ['--project', PID])
+    const {stderr} = await runExpectingExit(MonitorsList, ['--project', PID], 5)
     expect(stderr).toContain('R404-MON-001')
   })
 })

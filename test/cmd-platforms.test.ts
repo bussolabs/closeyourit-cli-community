@@ -39,7 +39,7 @@ describe('platforms list', () => {
 
   it('exits non-zero on an API error', async () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-PLT-001', 'forbidden'))
-    const {stderr} = await runExpectingExit(PlatformsList, [])
+    const {stderr} = await runExpectingExit(PlatformsList, [], 4)
     expect(stderr).toContain('R403-PLT-001')
   })
 })
