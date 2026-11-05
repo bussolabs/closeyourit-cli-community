@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-11-05
+
+### Corretto
+
+- **Strumenti di sviluppo aggiornati.** La libreria usata per far girare i test passa a una versione che corregge una falla di sicurezza segnalata. Nessun cambiamento nell'uso della CLI.
+
 ## [0.40.0] - 2026-11-05
 
 ### Aggiunto
