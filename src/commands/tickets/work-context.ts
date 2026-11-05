@@ -3,7 +3,15 @@ import {Args, Flags} from '@oclif/core'
 import {BaseCommand, projectFlag} from '../../base'
 import {ApiRequestError} from '../../lib/api'
 import {renderGuidance} from '../../lib/guidance'
-import {renderRecord, sanitize, sanitizeMultiline, section} from '../../lib/output'
+import {
+  AGENT_JSON_CONFLICT,
+  fenceUntrusted,
+  plainText,
+  renderRecord,
+  sanitize,
+  sanitizeMultiline,
+  section,
+} from '../../lib/output'
 
 /** A frozen entry (reference or procedure) inside the snapshot payload. */
 interface FrozenEntry extends Record<string, unknown> {
@@ -27,10 +35,15 @@ export default class TicketsWorkContext extends BaseCommand {
     '<%= config.bin %> tickets work-context DRFL-3 -p driverone-flutter',
     '<%= config.bin %> tickets work-context DRFL-3 -p driverone-flutter --full',
     '<%= config.bin %> tickets work-context DRFL-3 -p driverone-flutter --json',
+    '<%= config.bin %> tickets work-context DRFL-3 -p driverone-flutter --agent',
   ]
 
   static flags = {
     ...projectFlag,
+    agent: Flags.boolean({
+      description:
+        'Output for an AI agent: the snapshot and the full frozen text as plain text, cleaned of invisible characters and enclosed in an untrusted-ticket fence (max 12000 characters)',
+    }),
     full: Flags.boolean({
       description: 'Also print the frozen text of every reference and procedure, not just the table',
     }),
@@ -38,6 +51,7 @@ export default class TicketsWorkContext extends BaseCommand {
 
   async run(): Promise<unknown> {
     const {args, flags} = await this.parse(TicketsWorkContext)
+    if (flags.agent && this.jsonEnabled()) this.error(AGENT_JSON_CONFLICT, {exit: 2})
     const projectId = await this.resolveProjectId(flags.project)
     const path = `/cli/v1/projects/${encodeURIComponent(projectId)}/tickets/${encodeURIComponent(args.id)}/work_context`
 
@@ -51,7 +65,11 @@ export default class TicketsWorkContext extends BaseCommand {
       throw describeWorkContextError(error, args.id)
     }
 
-    if (!this.jsonEnabled()) {
+    // CYCL-84 — the frozen procedures are text an agent will act on: with --agent they arrive fenced,
+    // cleaned and capped, always in full (the --full table/text split is a human reading aid).
+    if (flags.agent) {
+      this.log(fenceUntrusted(`work context of ticket ${args.id}`, agentText(res.data ?? {})))
+    } else if (!this.jsonEnabled()) {
       const snapshot = res.data ?? {}
       this.log(
         `Work context frozen when ${sanitize(args.id)} was claimed from the agent queue — not the project's current guidance (that is \`guidance show\`).`,
@@ -94,6 +112,30 @@ function snapshotSummary(snapshot: Record<string, unknown>): Record<string, unkn
     payload_version: snapshot.payload_version ?? null,
     digest: snapshot.digest ?? null,
   }
+}
+
+/**
+ * The snapshot as one plain text for `--agent`: header, then every reference and procedure with its
+ * frozen text (CYCL-84). Entries without text still get their heading, so the list is complete.
+ */
+function agentText(snapshot: Record<string, unknown>): string {
+  const lines = Object.entries(snapshotSummary(snapshot)).map(([key, value]) => `${key}: ${plainText(value) || '-'}`)
+  const payload = (snapshot.payload ?? {}) as {procedures?: unknown; references?: unknown}
+  const groups: Array<[string, FrozenEntry[], 'content' | 'instructions']> = [
+    ['References', entries(payload.references), 'instructions'],
+    ['Procedures', entries(payload.procedures), 'content'],
+  ]
+  for (const [title, list, field] of groups) {
+    lines.push('', `## ${title} (${list.length})`)
+    for (const entry of list) {
+      const head = [entry.key, entry.level, entry.location].map((part) => plainText(part)).filter((part) => part !== '')
+      lines.push('', `### ${head.join(' · ')}`)
+      const text = plainText(entry[field])
+      if (text.trim() !== '') lines.push(text)
+    }
+  }
+
+  return lines.join('\n')
 }
 
 /** The entries of a payload list, or [] if the backend did not send it. */

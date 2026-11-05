@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-05
+
+### Aggiunto
+
+- **Lettura protetta per gli agenti.** `tickets show --agent` e `tickets work-context --agent` danno il testo pulito dai caratteri invisibili, dai segni di direzione e dai separatori di riga, codificato in JSON e chiuso in un recinto `<untrusted-ticket>` dichiarato come materiale non fidato: lo stesso recinto che l'automatore mette intorno al ticket. Oltre 12000 caratteri la fine si taglia e un avviso fuori dal recinto lo dice. `--json` resta identico. Le istruzioni degli agenti vanno aggiornate per usare `--agent`: finché non lo fanno, il testo arriva senza recinto.
+
 ## [0.39.0] - 2026-11-04
 
 ### Aggiunto

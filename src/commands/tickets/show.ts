@@ -1,7 +1,16 @@
-import {Args} from '@oclif/core'
+import {Args, Flags} from '@oclif/core'
 import {BaseCommand, projectFlag} from '../../base'
 import {renderGuidance} from '../../lib/guidance'
-import {renderRecord, renderTable, sanitize, sanitizeMultiline, section} from '../../lib/output'
+import {
+  AGENT_JSON_CONFLICT,
+  fenceUntrusted,
+  plainText,
+  renderRecord,
+  renderTable,
+  sanitize,
+  sanitizeMultiline,
+  section,
+} from '../../lib/output'
 
 export default class TicketsShow extends BaseCommand {
   static description =
@@ -11,16 +20,24 @@ export default class TicketsShow extends BaseCommand {
     '<%= config.bin %> tickets show <ticket-id> --project acme-api',
     '<%= config.bin %> tickets show DRFL-3 --project driverone-flutter',
     '<%= config.bin %> tickets show DRFL-3 -p driverone-flutter --json',
+    '<%= config.bin %> tickets show DRFL-3 -p driverone-flutter --agent',
   ]
 
   static args = {
     id: Args.string({description: 'Ticket id or code (e.g. DRFL-3)', required: true}),
   }
 
-  static flags = {...projectFlag}
+  static flags = {
+    ...projectFlag,
+    agent: Flags.boolean({
+      description:
+        'Output for an AI agent: the whole ticket as plain text, cleaned of invisible characters and enclosed in an untrusted-ticket fence (max 12000 characters)',
+    }),
+  }
 
   async run(): Promise<unknown> {
     const {args, flags} = await this.parse(TicketsShow)
+    if (flags.agent && this.jsonEnabled()) this.error(AGENT_JSON_CONFLICT, {exit: 2})
     const projectId = await this.resolveProjectId(flags.project)
     const base = `/cli/v1/projects/${encodeURIComponent(projectId)}/tickets/${encodeURIComponent(args.id)}`
 
@@ -31,7 +48,11 @@ export default class TicketsShow extends BaseCommand {
     const comments = await this.fetchAllPages(`${base}/comments`)
     const attachments = await this.fetchAllPages(`${base}/attachments`)
 
-    if (!this.jsonEnabled()) {
+    // CYCL-84 — the ticket text is written by people outside this session: an agent gets it fenced and
+    // capped. A new flag rather than a new --json, so the scripts that read --json see no change.
+    if (flags.agent) {
+      this.log(fenceUntrusted(`ticket ${args.id}`, agentText(ticket, comments, attachments)))
+    } else if (!this.jsonEnabled()) {
       this.renderTicket(ticket)
       this.renderComments(comments)
       this.renderAttachments(attachments)
@@ -163,4 +184,79 @@ export default class TicketsShow extends BaseCommand {
     this.log(section('Definition of Done', '✅'))
     for (const condition of conditions) this.log(`- ${sanitizeMultiline(condition.text ?? '')}`)
   }
+}
+
+type Row = Record<string, unknown>
+
+/** True when a field carries text worth a line: not null, not undefined, not blank. */
+function present(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== ''
+}
+
+/** A list field of the payload, or [] when the backend did not send one. */
+function rows(value: unknown): Row[] {
+  return Array.isArray(value) ? (value as Row[]) : []
+}
+
+// Objects and lists print through plainText, so a field sent as {id, name} is not lost on the way.
+const AGENT_FIELDS = [
+  'code',
+  'title',
+  'kind',
+  'status',
+  'priority',
+  'weight',
+  'assignee',
+  'reporter',
+  'reviewer',
+  'milestone',
+  'platforms',
+  'labels',
+]
+
+const AGENT_STEPS: Array<[string, string]> = [
+  ['Given', 'step_given'],
+  ['When', 'step_when'],
+  ['Then', 'step_then'],
+  ['Expected', 'step_expected'],
+]
+
+/**
+ * The whole ticket as one plain text for `--agent` (CYCL-84): every field a person wrote — title,
+ * description, analysis, scenarios, Definition of Done, comments, file names — goes inside the fence.
+ * The comments heading is there even at zero, so the agent knows the discussion was read and is empty.
+ */
+function agentText(ticket: Row, comments: Row[], attachments: Row[]): string {
+  const lines: string[] = []
+  for (const key of AGENT_FIELDS) {
+    const value = plainText(ticket[key])
+    if (present(value)) lines.push(`${key}: ${value}`)
+  }
+
+  if (present(ticket.description)) lines.push('', '## Description', plainText(ticket.description))
+  if (present(ticket.technical_analysis)) lines.push('', '## Technical analysis', plainText(ticket.technical_analysis))
+
+  rows(ticket.scenarios).forEach((scenario, index) => {
+    const title = plainText(scenario.title)
+    lines.push('', present(title) ? `## Scenario ${index + 1}: ${title}` : `## Scenario ${index + 1}`)
+    for (const [label, key] of AGENT_STEPS) if (present(scenario[key])) lines.push(`${label}: ${plainText(scenario[key])}`)
+  })
+
+  const conditions = rows(ticket.conditions)
+  if (conditions.length > 0) {
+    lines.push('', '## Definition of Done')
+    for (const condition of conditions) lines.push(`- ${plainText(condition.text)}`)
+  }
+
+  lines.push('', `## Comments (${comments.length})`)
+  for (const comment of comments) {
+    const author = plainText(comment.author) || '?'
+    lines.push('', `### ${author} · ${plainText(comment.created_at)}`, plainText(comment.body))
+    for (const file of rows(comment.files)) lines.push(`[file] ${plainText(file.filename)}`)
+  }
+
+  lines.push('', `## Attachments (${attachments.length})`)
+  for (const attachment of attachments) lines.push(`- ${plainText(attachment.filename)}`)
+
+  return lines.join('\n')
 }
