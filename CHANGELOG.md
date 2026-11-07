@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.40.2] - 2026-11-07
+
+### Corretto
+
+- **Le novità della 0.40 arrivano su npm.** Le versioni 0.40.0 e 0.40.1 non erano state pubblicate per un numero di versione rimasto indietro. Ora la CLI installata le contiene.
+
 ## [0.40.1] - 2026-11-05
 
 ### Corretto

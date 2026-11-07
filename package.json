@@ -1,6 +1,6 @@
 {
   "name": "@bussolabs/closeyourit-cli",
-  "version": "0.39.0",
+  "version": "0.40.2",
   "description": "CLI for CloseYourIt — manage org, errors, tokens and tickets with your user token",
   "publishConfig": {
     "access": "public"
