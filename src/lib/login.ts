@@ -2,6 +2,7 @@ import {CliApi} from './api'
 import type {LoginIdentity} from './config'
 import {isSameOriginHttpUrl, openUrl} from './browser'
 import {pollDeviceToken, startDeviceFlow} from './device-flow'
+import {deviceCodeLifetime} from './timeouts'
 
 export interface DeviceLoginResult {
   identity: LoginIdentity
@@ -38,7 +39,8 @@ export async function deviceLogin(
 
   const result = await pollDeviceToken(apiUrl, authorization.device_code, {
     interval: authorization.interval,
-    expiresIn: authorization.expires_in,
+    // Unchecked server data: a missing or unusable lifetime falls back, so the wait always ends.
+    expiresIn: deviceCodeLifetime(authorization.expires_in),
     onPending: () => {
       if (!opts.quiet) process.stderr.write('.')
     },

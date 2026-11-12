@@ -1,5 +1,6 @@
 import type {CliConfig} from './config'
 import {ErrorCodes} from '../errors/error-codes'
+import {deadline, type Deadline, failureReason, REQUEST_TIMEOUT_MS, TRANSFER_TIMEOUT_MS} from './timeouts'
 
 /** Error carrying the HTTP status and the structured code from the backend envelope (R/G prefix) or a local C-prefix fallback. */
 export class ApiRequestError extends Error {
@@ -24,7 +25,8 @@ export interface RequestOptions {
    * Abort the request when the caller cannot afford to wait (CYCL-55): `kb context` runs at the
    * start of every session, where a stalled connection would be paid on each one. Without it fetch
    * waits as long as the OS lets it. An aborted call surfaces as a network ApiRequestError, like
-   * any other unreachable server.
+   * any other unreachable server. It adds to the client's own time ceiling (CYCL-93), never
+   * replaces it: whichever fires first stops the call.
    */
   signal?: AbortSignal
 }
@@ -49,6 +51,15 @@ function serverNextSteps(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined
   const steps = value.filter((step): step is string => typeof step === 'string' && step.trim() !== '')
   return steps.length > 0 ? steps : undefined
+}
+
+/**
+ * A call that never got an answer. It stays a network failure (`Network.requestFailed`) whatever
+ * stopped it, so every caller that handles one keeps working; only the message tells a timeout
+ * (CYCL-93) from a caller's abort or an unreachable server.
+ */
+function requestFailed(url: string, err: unknown, limit: Deadline): ApiRequestError {
+  return new ApiRequestError(0, ErrorCodes.Network.requestFailed, `Request to ${url} failed: ${failureReason(err, limit)}`)
 }
 
 const READ_METHODS = new Set<HttpMethod>(['GET', 'HEAD', 'OPTIONS'] as HttpMethod[])
@@ -88,20 +99,27 @@ export class CliApi {
     headers['Content-Type'] = 'application/json'
 
     const url = this.resolveUrl(this.withConfirmation(method, path))
+    // Ceiling on every call (CYCL-93), body included, on top of `signal`: a server that accepts
+    // the connection and never answers must not hang a command.
+    const limit = deadline(REQUEST_TIMEOUT_MS, opts.signal ?? this.signal)
 
-    let res: Response
     try {
-      res = await fetch(url, {
-        method,
-        headers,
-        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-        signal: opts.signal ?? this.signal,
-      })
-    } catch (err) {
-      throw new ApiRequestError(0, ErrorCodes.Network.requestFailed, `Request to ${url} failed: ${(err as Error).message}`)
-    }
+      let res: Response
+      try {
+        res = await fetch(url, {
+          method,
+          headers,
+          body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+          signal: limit.signal,
+        })
+      } catch (err) {
+        throw requestFailed(url, err, limit)
+      }
 
-    return this.handleResponse<T>(res)
+      return await this.handleResponse<T>(res, limit)
+    } finally {
+      limit.release()
+    }
   }
 
   /**
@@ -125,15 +143,21 @@ export class CliApi {
     }
 
     const url = this.resolveUrl(path)
+    // A file moves more bytes than a JSON call: it gets the wider ceiling.
+    const limit = deadline(TRANSFER_TIMEOUT_MS, opts.signal ?? this.signal)
 
-    let res: Response
     try {
-      res = await fetch(url, {method, headers, body: form})
-    } catch (err) {
-      throw new ApiRequestError(0, ErrorCodes.Network.requestFailed, `Request to ${url} failed: ${(err as Error).message}`)
-    }
+      let res: Response
+      try {
+        res = await fetch(url, {method, headers, body: form, signal: limit.signal})
+      } catch (err) {
+        throw requestFailed(url, err, limit)
+      }
 
-    return this.handleResponse<T>(res)
+      return await this.handleResponse<T>(res, limit)
+    } finally {
+      limit.release()
+    }
   }
 
   /** Add `confirm=1` to a writing request when the user passed `--yes`; reads are left alone. */
@@ -159,9 +183,10 @@ export class CliApi {
   }
 
   /** Parse the response body and map the error envelope to an ApiRequestError. Shared by request() and upload(). */
-  private async handleResponse<T>(res: Response): Promise<Envelope<T>> {
-    // The body can fail after the headers arrived: an abort that fires mid-read (RequestOptions.signal),
-    // a connection that drops. That is the same network failure as one on the first byte, so it must
+  private async handleResponse<T>(res: Response, limit?: Deadline): Promise<Envelope<T>> {
+    // The body can fail after the headers arrived: an abort that fires mid-read (RequestOptions.signal,
+    // or the time ceiling, which the fetch signal keeps running while the body streams), a connection
+    // that drops. That is the same network failure as one on the first byte, so it must
     // come out as an ApiRequestError — raw, it would escape every caller that maps failures by that
     // type, and a command counting on a quiet failure would crash instead.
     let text: string
@@ -171,7 +196,7 @@ export class CliApi {
       throw new ApiRequestError(
         0,
         ErrorCodes.Network.requestFailed,
-        `Reading the response failed: ${(err as Error).message}`,
+        `Reading the response failed: ${limit ? failureReason(err, limit) : (err as Error).message}`,
       )
     }
 
@@ -236,16 +261,28 @@ export class CliApi {
     const headers = this.authHeaders(true)
     headers.Accept = '*/*'
     const url = this.resolveUrl(path)
+    const limit = deadline(TRANSFER_TIMEOUT_MS, this.signal)
+    try {
+      return await this.fetchDownload(url, headers, limit)
+    } finally {
+      limit.release()
+    }
+  }
 
+  private async fetchDownload(
+    url: string,
+    headers: Record<string, string>,
+    limit: Deadline,
+  ): Promise<{contentType?: string; data: Uint8Array; filename?: string}> {
     let res: Response
     try {
-      res = await fetch(url, {method: 'GET', headers, redirect: 'follow'})
+      res = await fetch(url, {method: 'GET', headers, redirect: 'follow', signal: limit.signal})
     } catch (err) {
-      throw new ApiRequestError(0, ErrorCodes.Network.requestFailed, `Request to ${url} failed: ${(err as Error).message}`)
+      throw requestFailed(url, err, limit)
     }
 
     if (!res.ok) {
-      await this.handleResponse<unknown>(res) // always throws: maps the JSON error envelope
+      await this.handleResponse<unknown>(res, limit) // always throws: maps the JSON error envelope
       throw new ApiRequestError(res.status, `C${res.status}-API-000`, `Download failed (${res.status})`)
     }
 
@@ -253,7 +290,13 @@ export class CliApi {
     // resolveProjectId) left behind so it cannot leak into the pagination footer (CYCL-11). The
     // success path bypasses handleResponse, so this reset must be explicit.
     this.lastMeta = undefined
-    const data = new Uint8Array(await res.arrayBuffer())
+    // The bytes stream under the same ceiling as the headers; a stall here is the same network failure.
+    let data: Uint8Array
+    try {
+      data = new Uint8Array(await res.arrayBuffer())
+    } catch (err) {
+      throw new ApiRequestError(0, ErrorCodes.Network.requestFailed, `Reading the download failed: ${failureReason(err, limit)}`)
+    }
     const disposition = res.headers.get('content-disposition') ?? ''
     const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
     const filename = match ? decodeURIComponent(match[1].replace(/"$/, '')) : undefined

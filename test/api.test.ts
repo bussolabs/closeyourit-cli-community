@@ -1,7 +1,10 @@
-import {afterEach, describe, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 import {ApiRequestError, CliApi} from '../src/lib/api'
+import {REQUEST_TIMEOUT_MS, TRANSFER_TIMEOUT_MS} from '../src/lib/timeouts'
 
 afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -39,19 +42,206 @@ describe('CliApi', () => {
   it('puts the client abort signal on every request, when there is one', async () => {
     // CYCL-56 — the MCP server sets it only once: this way the abort also reaches the by-name
     // lookups a call carries along, without going through every signature in between.
-    const fetchMock = vi.fn(async () => response({ok: true, status: 200, body: {data: {}}}))
-    vi.stubGlobal('fetch', fetchMock)
+    // The aborts happen while the call is in flight: once it is over, the call lets go of the signals.
+    let inFlight: (sent: AbortSignal) => void = () => undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        inFlight(init.signal as AbortSignal)
+        return response({ok: true, status: 200, body: {data: {}}})
+      }),
+    )
     const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
     const client = new AbortController()
     api.signal = client.signal
 
+    // Combined with the time ceiling (CYCL-93), not replaced by it: the client abort still stops the call.
+    const seen: boolean[] = []
+    inFlight = (sent) => {
+      seen.push(sent.aborted)
+      client.abort()
+      seen.push(sent.aborted)
+    }
     await api.get('/cli/v1/whoami')
-    expect(fetchMock.mock.calls[0][1].signal).toBe(client.signal)
+    expect(seen).toEqual([false, true])
 
     // The single request one is more specific and wins: `kb context` has its own deadline.
+    const otherClient = new AbortController()
+    api.signal = otherClient.signal
     const perRequest = new AbortController()
+    const seenPerRequest: boolean[] = []
+    inFlight = (sent) => {
+      otherClient.abort()
+      seenPerRequest.push(sent.aborted)
+      perRequest.abort()
+      seenPerRequest.push(sent.aborted)
+    }
     await api.get('/cli/v1/whoami', {signal: perRequest.signal})
-    expect(fetchMock.mock.calls[1][1].signal).toBe(perRequest.signal)
+    expect(seenPerRequest).toEqual([false, true])
+  })
+
+  describe('time ceiling (CYCL-93)', () => {
+    /** A server that accepts the call and never answers: only an abort ends it. */
+    function silentFetch() {
+      return vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {once: true})
+          }),
+      )
+    }
+
+    /** Headers arrive, then the body stalls until the abort. */
+    function stalledBody(init: RequestInit, method: 'text' | 'arrayBuffer') {
+      const stall = () =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {once: true})
+        })
+      return {ok: true, status: 200, statusText: '', headers: {get: () => null}, [method]: stall}
+    }
+
+    it('gives every call a ceiling, and a wider one to file transfers', () => {
+      expect(REQUEST_TIMEOUT_MS).toBe(30_000)
+      expect(TRANSFER_TIMEOUT_MS).toBe(300_000)
+      expect(TRANSFER_TIMEOUT_MS).toBeGreaterThan(REQUEST_TIMEOUT_MS)
+    })
+
+    // A fake clock drives every ceiling below: the tests prove the real values, without waiting for them.
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('stops a call the server never answers, as a network failure that says so', async () => {
+      const fetchMock = silentFetch()
+      vi.stubGlobal('fetch', fetchMock)
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+
+      const pending = api.get('/cli/v1/projects').catch((err: unknown) => err)
+      await vi.advanceTimersByTimeAsync(29_999)
+      expect((fetchMock.mock.calls[0][1].signal as AbortSignal).aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+
+      const error = await pending
+      expect(error).toBeInstanceOf(ApiRequestError)
+      expect((error as ApiRequestError).status).toBe(0)
+      expect((error as ApiRequestError).code).toBe('C000-NET-001')
+      expect((error as ApiRequestError).message).toBe(
+        'Request to https://api.test/cli/v1/projects failed: the server did not respond within 30 seconds',
+      )
+    })
+
+    it('keeps the ceiling running while the body is read', async () => {
+      vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => stalledBody(init, 'text')))
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+
+      const pending = api.get('/cli/v1/projects').catch((err: unknown) => err)
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      const error = await pending
+      expect((error as ApiRequestError).code).toBe('C000-NET-001')
+      expect((error as ApiRequestError).message).toMatch(/Reading the response failed: the server did not respond within 30 seconds/)
+    })
+
+    it('does not call a caller abort a timeout', async () => {
+      // The MCP shutdown and `kb context --timeout` stop calls on purpose: the message stays theirs.
+      vi.stubGlobal('fetch', silentFetch())
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+      const shutdown = new AbortController()
+      api.signal = shutdown.signal
+
+      const pending = api.get('/cli/v1/projects').catch((err: unknown) => err)
+      shutdown.abort()
+      const error = (await pending) as ApiRequestError
+      expect(error.code).toBe('C000-NET-001')
+      expect(error.message).not.toMatch(/did not respond/)
+
+      // A caller deadline that aborts as a timeout (`kb context --timeout`) is still the caller's, not the ceiling.
+      const own = new AbortController()
+      const ownPending = api.get('/cli/v1/projects', {signal: own.signal}).catch((err: unknown) => err)
+      own.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+      expect(((await ownPending) as ApiRequestError).message).not.toMatch(/did not respond/)
+    })
+
+    it('lets an upload run past the ordinary ceiling, up to the transfer one', async () => {
+      // A slow but regular attachment: two minutes, four times the ordinary ceiling.
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit) => {
+          await new Promise((resolve) => setTimeout(resolve, 2 * 60_000))
+          if (init.signal?.aborted) throw init.signal.reason
+          return response({ok: true, status: 201, body: {data: {id: 'f1'}}})
+        }),
+      )
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+
+      const pending = api.upload('POST', '/cli/v1/files', [{field: 'file', filename: 'a.txt', data: new Blob(['a'])}])
+      await vi.advanceTimersByTimeAsync(2 * 60_000)
+      expect((await pending).data).toEqual({id: 'f1'})
+    })
+
+    it('stops an upload past the transfer ceiling', async () => {
+      const fetchMock = silentFetch()
+      vi.stubGlobal('fetch', fetchMock)
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+
+      const pending = api
+        .upload('POST', '/cli/v1/files', [{field: 'file', filename: 'a.txt', data: new Blob(['a'])}])
+        .catch((err: unknown) => err)
+      await vi.advanceTimersByTimeAsync(5 * 60_000 - 1)
+      expect((fetchMock.mock.calls[0][1].signal as AbortSignal).aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+
+      const error = await pending
+      expect((error as ApiRequestError).code).toBe('C000-NET-001')
+      expect((error as ApiRequestError).message).toMatch(/did not respond within 5 minutes/)
+    })
+
+    it('stops a download whose bytes stall, under the transfer ceiling', async () => {
+      vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => stalledBody(init, 'arrayBuffer')))
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+
+      const pending = api.download('/cli/v1/attachments/1').catch((err: unknown) => err)
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+
+      const error = await pending
+      expect(error).toBeInstanceOf(ApiRequestError)
+      expect((error as ApiRequestError).code).toBe('C000-NET-001')
+      expect((error as ApiRequestError).message).toMatch(/Reading the download failed: the server did not respond within 5 minutes/)
+    })
+
+    it('takes its listener back from the client signal once each call is over', async () => {
+      // The MCP server's signal lives as long as the server: listeners left behind would pile up.
+      vi.stubGlobal('fetch', vi.fn(async () => response({ok: true, status: 200, body: {data: {}}})))
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+      const client = new AbortController()
+      const add = vi.spyOn(client.signal, 'addEventListener')
+      const remove = vi.spyOn(client.signal, 'removeEventListener')
+      api.signal = client.signal
+
+      for (let i = 0; i < 20; i += 1) await api.get('/cli/v1/whoami')
+      await api.upload('POST', '/cli/v1/files', [{field: 'file', filename: 'a.txt', data: new Blob(['a'])}])
+
+      expect(add).toHaveBeenCalledTimes(21)
+      expect(remove.mock.calls.map((call) => call[1])).toEqual(add.mock.calls.map((call) => call[1]))
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('still lets the client abort stop a download', async () => {
+      vi.stubGlobal('fetch', silentFetch())
+      const api = new CliApi({apiUrl: 'https://api.test', token: 'tok'})
+      const shutdown = new AbortController()
+      api.signal = shutdown.signal
+
+      const pending = api.download('/cli/v1/attachments/1').catch((err: unknown) => err)
+      shutdown.abort()
+      const error = (await pending) as ApiRequestError
+      expect(error.code).toBe('C000-NET-001')
+      expect(error.message).not.toMatch(/did not respond/)
+    })
   })
 
   it('maps an abort while reading the body as a network failure, not as a raw exception', async () => {

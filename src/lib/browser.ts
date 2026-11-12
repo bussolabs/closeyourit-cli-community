@@ -16,6 +16,21 @@ export function isSameOriginHttpUrl(url: string | undefined, apiUrl: string): bo
   }
 }
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+/**
+ * True for a plain-http server address that is not this computer (CYCL-93): the login would send
+ * the device code and receive the token in clear. Local addresses are a developer's own server.
+ */
+export function isInsecureRemoteUrl(url: string): boolean {
+  try {
+    const target = new URL(url)
+    return target.protocol === 'http:' && !LOCAL_HOSTS.has(target.hostname)
+  } catch {
+    return false
+  }
+}
+
 /** Best-effort: open a URL in the default browser. Never throws. */
 export function openUrl(url: string): void {
   try {

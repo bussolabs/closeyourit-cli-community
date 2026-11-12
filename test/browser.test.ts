@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {spawn} from 'node:child_process'
-import {isSameOriginHttpUrl, openUrl} from '../src/lib/browser'
+import {isInsecureRemoteUrl, isSameOriginHttpUrl, openUrl} from '../src/lib/browser'
 
 vi.mock('node:child_process', () => ({spawn: vi.fn()}))
 
@@ -88,5 +88,23 @@ describe('isSameOriginHttpUrl', () => {
     expect(isSameOriginHttpUrl('https://x & calc', apiUrl)).toBe(false)
     expect(isSameOriginHttpUrl('', apiUrl)).toBe(false)
     expect(isSameOriginHttpUrl(undefined, apiUrl)).toBe(false)
+  })
+})
+
+describe('isInsecureRemoteUrl (CYCL-93)', () => {
+  it('flags a plain-http address on another computer', () => {
+    expect(isInsecureRemoteUrl('http://staging.closeyour.it')).toBe(true)
+    expect(isInsecureRemoteUrl('http://10.0.0.5:3000')).toBe(true)
+  })
+
+  it('leaves HTTPS and this computer alone', () => {
+    expect(isInsecureRemoteUrl('https://app.closeyour.it')).toBe(false)
+    expect(isInsecureRemoteUrl('http://localhost:3000')).toBe(false)
+    expect(isInsecureRemoteUrl('http://127.0.0.1:3000')).toBe(false)
+    expect(isInsecureRemoteUrl('http://[::1]:3000')).toBe(false)
+  })
+
+  it('says nothing about an address it cannot read', () => {
+    expect(isInsecureRemoteUrl('not a url')).toBe(false)
   })
 })

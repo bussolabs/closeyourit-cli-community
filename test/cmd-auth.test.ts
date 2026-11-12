@@ -250,6 +250,50 @@ describe('login', () => {
     }
     expect(saveConfig).not.toHaveBeenCalled()
   })
+
+  describe('warning on a plain-http server (CYCL-93)', () => {
+    async function login(argv: string[]): Promise<{stdout: string; stderr: string}> {
+      vi.mocked(startDeviceFlow).mockResolvedValue(authorization)
+      vi.mocked(pollDeviceToken).mockResolvedValue(tokenResult)
+      apiMock.get.mockResolvedValue(envelope({}))
+      const cap = capture()
+      try {
+        await run(Login, argv)
+      } finally {
+        cap.restore()
+      }
+      return {stdout: cap.stdout(), stderr: cap.stderr()}
+    }
+
+    it('warns on stderr for --api-url, and the login goes on', async () => {
+      const {stderr} = await login(['--api-url', 'http://staging.internal.test'])
+      expect(stderr).toContain('Warning: http://staging.internal.test is not HTTPS')
+      expect(saveConfig).toHaveBeenCalledOnce()
+    })
+
+    it('warns for an address coming from CLOSEYOURIT_API_URL', async () => {
+      // loadConfig is where the variable overrides the stored address.
+      vi.mocked(loadConfig).mockReturnValue({apiUrl: 'http://from-env.internal.test'})
+      const {stderr} = await login([])
+      expect(stderr).toContain('Warning: http://from-env.internal.test is not HTTPS')
+    })
+
+    it('keeps the warning out of the JSON output', async () => {
+      const {stdout, stderr} = await login(['--json', '--api-url', 'http://staging.internal.test'])
+      expect(stderr).toContain('is not HTTPS')
+      expect(stdout).not.toContain('Warning')
+      expect(stdout).not.toContain('not HTTPS')
+    })
+
+    it.each(['https://app.closeyour.it', 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000'])(
+      'says nothing for %s',
+      async (apiUrl) => {
+        const {stderr} = await login(['--api-url', apiUrl])
+        expect(stderr).not.toContain('not HTTPS')
+        expect(saveConfig).toHaveBeenCalledOnce()
+      },
+    )
+  })
 })
 
 describe('logout', () => {

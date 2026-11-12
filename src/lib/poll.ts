@@ -13,9 +13,10 @@ import {ErrorCodes} from '../errors/error-codes'
  * turn into hundreds of requests) and the wait always ends (`timeoutMs`), because a command that
  * hangs forever on a terminal is worse than one that gives up and says where the answer will be.
  *
- * `timeoutMs` bounds the pauses and the number of attempts, not a single request: one `fetch` that
- * never returns still hangs, because `CliApi` sends without an abort signal — a gap that belongs to
- * the HTTP layer and would have to be closed there, for every command at once.
+ * `timeoutMs` bounds the pauses and the number of attempts, not a single request: that one is bounded
+ * by `CliApi` itself, which gives every call its own time ceiling (CYCL-93). A request stuck on a
+ * silent server fails as a network error there, and the whole wait can overrun `timeoutMs` by at
+ * most that ceiling.
  */
 export interface PollOptions<T> {
   /** What the caller already holds (the POST response): already settled → no request at all. */

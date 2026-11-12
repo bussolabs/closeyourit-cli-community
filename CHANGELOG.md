@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.40.3] - 2026-11-12
+
+### Corretto
+
+- **Nessun comando resta bloccato su un server che non risponde.** Ogni chiamata si ferma dopo 30 secondi, e dopo 5 minuti per invio e scaricamento di file, con un messaggio che dice che il server non ha risposto in tempo. Vale anche per il login.
+- **Il login sopporta gli errori momentanei.** Mentre aspetta la conferma nel browser, riprova da solo se la rete cade o il server è sovraccarico, fino alla scadenza del codice. Un rifiuto esplicito lo chiude subito, come prima. Se il server non dice quanto dura il codice, l'attesa finisce comunque dopo 10 minuti.
+- **Avviso per un server non protetto.** `login` avvisa quando l'indirizzo del server non usa HTTPS, tranne per il computer locale, e prosegue comunque.
+
 ## [0.40.2] - 2026-11-07
 
 ### Corretto
