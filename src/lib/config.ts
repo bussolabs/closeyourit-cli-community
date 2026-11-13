@@ -1,6 +1,9 @@
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import {ErrorCodes} from '../errors/error-codes'
+import {ApiRequestError} from './api'
+import {writePrivateFileSync} from './private-file'
 
 export interface CliConfig {
   apiUrl: string
@@ -59,20 +62,44 @@ function envToken(): string | undefined {
 }
 
 /**
+ * A config that exists and cannot be read stops the command. Read as empty, the next save would
+ * overwrite it and drop every other saved organization.
+ */
+function unreadableConfig(file: string, reason: string): ApiRequestError {
+  return new ApiRequestError(
+    0,
+    ErrorCodes.Config.corrupted,
+    `Cannot read the CLI config at ${file} (${reason}). Move it away or fix it, then run the command again.`,
+  )
+}
+
+/** The file as stored, or nothing when it does not exist yet: the only case that means "not logged in". */
+function readConfigFile(file: string): Partial<CliConfig> {
+  let raw: string
+  try {
+    raw = fs.readFileSync(file, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw unreadableConfig(file, (error as NodeJS.ErrnoException).code ?? 'read failed')
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw unreadableConfig(file, 'not valid JSON')
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw unreadableConfig(file, 'not a JSON object')
+  return parsed as Partial<CliConfig>
+}
+
+/**
  * Config exactly as stored on disk, ignoring env overrides. Non-login mutations such as logout
  * preserve this issuer. A successful login separately persists the issuer of its newly issued token.
  */
 export function loadStoredConfig(): CliConfig {
-  const file = configPath()
-  let parsed: Partial<CliConfig> = {}
-  try {
-    if (fs.existsSync(file)) {
-      parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<CliConfig>
-    }
-  } catch {
-    // Corrupted/unreadable config falls back to defaults rather than crashing.
-    parsed = {}
-  }
+  const parsed = readConfigFile(configPath())
   return {
     apiUrl: parsed.apiUrl && parsed.apiUrl.trim() !== '' ? parsed.apiUrl : DEFAULT_API_URL,
     token: parsed.token,
@@ -120,10 +147,9 @@ export function loadConfig(): CliConfig {
 export function saveConfig(cfg: CliConfig): void {
   const dir = configDir()
   fs.mkdirSync(dir, {recursive: true})
-  const file = configPath()
-  fs.writeFileSync(file, `${JSON.stringify(cfg, null, 2)}\n`, {mode: 0o600})
-  // Ensure perms even if the file pre-existed with a looser mode.
-  fs.chmodSync(file, 0o600)
+  // Written aside and renamed over the old file: a command reading it at the same time never finds
+  // it empty or half-written, and the new inode is owner-only even if the old one was looser.
+  writePrivateFileSync(configPath(), `${JSON.stringify(cfg, null, 2)}\n`)
 }
 
 function activeLogin(cfg: CliConfig): SavedLogin | undefined {

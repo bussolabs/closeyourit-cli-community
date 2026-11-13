@@ -193,3 +193,66 @@ describe('saved logins', () => {
     expect(savedLogins(loadStoredConfig()).map((login) => login.token)).toEqual(['tok_acme'])
   })
 })
+
+describe('config file on disk', () => {
+  const acme = {apiUrl: 'https://example.test', token: 'tok_acme', organization: {id: 'o1', name: 'Acme', slug: 'acme'}}
+  const beta = {apiUrl: 'https://example.test', token: 'tok_beta', organization: {id: 'o2', name: 'Beta', slug: 'beta'}}
+
+  it('a save replaces the file instead of truncating it, so a reader never sees it empty', () => {
+    saveConfig(withActiveLogin({apiUrl: 'https://example.test'}, acme))
+    const before = fs.readFileSync(configPath(), 'utf8')
+    // A reader that opened the file before the save keeps reading a complete one.
+    const reader = fs.openSync(configPath(), 'r')
+    try {
+      saveConfig(withActiveLogin(loadStoredConfig(), beta))
+
+      expect(fs.readFileSync(reader, 'utf8')).toBe(before)
+    } finally {
+      fs.closeSync(reader)
+    }
+
+    expect(savedLogins(loadStoredConfig()).map((login) => login.organization.slug)).toEqual(['acme', 'beta'])
+  })
+
+  it('a save leaves no temporary file behind', () => {
+    saveConfig({apiUrl: 'https://example.test', token: 'tok'})
+    saveConfig({apiUrl: 'https://example.test', token: 'tok_2'})
+
+    expect(fs.readdirSync(dir)).toEqual(['config.json'])
+  })
+
+  it('a save makes a file readable by others owner-only and keeps the other organizations', () => {
+    fs.writeFileSync(configPath(), JSON.stringify(withActiveLogin({apiUrl: 'https://example.test'}, acme)), {mode: 0o644})
+    fs.chmodSync(configPath(), 0o644)
+
+    saveConfig(withActiveLogin(loadStoredConfig(), beta))
+
+    expect(fs.statSync(configPath()).mode & 0o777).toBe(0o600)
+    expect(savedLogins(loadStoredConfig()).map((login) => login.organization.slug)).toEqual(['acme', 'beta'])
+  })
+
+  it.each([
+    ['not valid JSON', '{"apiUrl": "https://example.test", "tok'],
+    ['not a JSON object', 'null'],
+    ['not a JSON object', '[]'],
+  ])('a file that is %s stops the read and names the file', (reason, content) => {
+    fs.writeFileSync(configPath(), content)
+
+    expect(() => loadStoredConfig()).toThrow(expect.objectContaining({code: 'C000-CFG-002'}))
+    expect(() => loadConfig()).toThrow(`Cannot read the CLI config at ${configPath()} (${reason})`)
+  })
+
+  it('a config path that cannot be read stops the read instead of looking empty', () => {
+    fs.mkdirSync(configPath())
+
+    expect(() => loadStoredConfig()).toThrow(`Cannot read the CLI config at ${configPath()} (EISDIR)`)
+  })
+
+  it('logout never rewrites a file it cannot read', () => {
+    const corrupted = '{"logins": [{"token": "tok_acme"'
+    fs.writeFileSync(configPath(), corrupted)
+
+    expect(() => clearToken()).toThrow('Move it away or fix it')
+    expect(fs.readFileSync(configPath(), 'utf8')).toBe(corrupted)
+  })
+})

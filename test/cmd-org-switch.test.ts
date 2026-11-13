@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import {apiMock, resetApiMock} from './helpers/api-mock'
-import {capture, envelope, run, runCaptured} from './helpers/command'
+import {capture, envelope, run, runCaptured, runExpectingExit} from './helpers/command'
 import {loadStoredConfig, saveConfig, savedLogins, withActiveLogin} from '../src/lib/config'
 import {pollDeviceToken, startDeviceFlow} from '../src/lib/device-flow'
 
@@ -199,6 +199,44 @@ describe('login', () => {
     await runCaptured(Login, [])
 
     expect(loadStoredConfig().organization?.slug).toBe('beta')
+    expect(savedLogins(loadStoredConfig()).map((login) => login.organization.slug)).toEqual(['acme', 'beta'])
+  })
+})
+
+describe('a config file that cannot be read', () => {
+  const corrupted = '{"logins": [{"token": "tok_acme"'
+
+  beforeEach(() => {
+    fs.writeFileSync(path.join(dir, 'config.json'), corrupted)
+  })
+
+  it('stops the command, names the file and leaves it as it was', async () => {
+    const {stderr} = await runExpectingExit(OrgSwitch, ['acme'], 1)
+
+    expect(stderr).toContain(`C000-CFG-002: Cannot read the CLI config at ${path.join(dir, 'config.json')}`)
+    expect(stderr).toContain('Move it away or fix it')
+    expect(startDeviceFlow).not.toHaveBeenCalled()
+    expect(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).toBe(corrupted)
+  })
+
+  it('stops the command with the same error in --json', async () => {
+    const {stdout} = await runExpectingExit(OrgList, ['--json'], 1)
+
+    expect(JSON.parse(stdout)).toEqual({
+      error: {code: 'C000-CFG-002', message: expect.stringContaining(path.join(dir, 'config.json'))},
+    })
+  })
+})
+
+describe('a config file readable by others', () => {
+  it('becomes owner-only after a switch and keeps the other organizations', async () => {
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(withActiveLogin(withActiveLogin({apiUrl: API}, acme), beta)))
+    fs.chmodSync(path.join(dir, 'config.json'), 0o644)
+
+    await runCaptured(OrgSwitch, ['acme'])
+
+    expect(fs.statSync(path.join(dir, 'config.json')).mode & 0o777).toBe(0o600)
+    expect(loadStoredConfig().organization?.slug).toBe('acme')
     expect(savedLogins(loadStoredConfig()).map((login) => login.organization.slug)).toEqual(['acme', 'beta'])
   })
 })

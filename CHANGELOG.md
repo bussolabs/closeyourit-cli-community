@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.40.4] - 2026-11-13
+
+### Corretto
+
+- **Il file degli accessi non resta mai vuoto o scritto a metà.** Login, cambio di organizzazione e logout preparano il nuovo file a parte e lo mettono al posto del vecchio in un colpo solo: un comando che gira nello stesso momento trova sempre il file completo, e il file resta leggibile solo dal proprietario.
+- **Un file degli accessi rovinato ferma il comando invece di essere svuotato.** Prima veniva letto come vuoto e il salvataggio successivo cancellava le altre organizzazioni. Ora il comando si ferma con l'errore `C000-CFG-002`, che indica il percorso del file e dice di spostarlo o correggerlo; il file non viene toccato. Senza file salvato non cambia niente.
+
 ## [0.40.3] - 2026-11-12
 
 ### Corretto
