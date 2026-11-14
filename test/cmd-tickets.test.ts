@@ -26,6 +26,7 @@ import TicketsComments from '../src/commands/tickets/comments'
 import TicketsCreate from '../src/commands/tickets/create'
 import TicketsDelete from '../src/commands/tickets/delete'
 import TicketsDetach from '../src/commands/tickets/detach'
+import TicketsHistory from '../src/commands/tickets/history'
 import TicketsEligibility from '../src/commands/tickets/eligibility'
 import TicketsLeaseClaim from '../src/commands/tickets/lease/claim'
 import TicketsLeaseRelease from '../src/commands/tickets/lease/release'
@@ -2139,5 +2140,62 @@ describe('length limits declared and checked before saving (CYCL-32)', () => {
       expect(apiMock.get).not.toHaveBeenCalled()
       expect(apiMock.put).toHaveBeenCalled()
     })
+  })
+})
+
+// CYRA-1309 / CYCL-94 — the ticket history with what each edit replaced.
+describe('tickets history', () => {
+  const longText = `Old description. ${'x'.repeat(600)}`
+  const events = [
+    {
+      id: 'ev-2', action: 'updated', actor_name: 'Ada', created_at: '2026-11-14T10:00:00Z', impersonated: false,
+      data: {description: [longText, 'New description'], priority: {from: 'Low', to: 'High'},
+        platforms: {added: ['Android'], removed: ['iOS']}},
+    },
+    {id: 'ev-1', action: 'created', actor_name: 'Bea', created_at: '2026-11-13T09:00:00Z', impersonated: false, data: {}},
+  ]
+
+  it('requests the events of the ticket, page by page', async () => {
+    apiMock.get.mockResolvedValue(envelope(events, {page: 2, total_pages: 2}))
+    await runCaptured(TicketsHistory, [T, '--project', PID, '--page', '2'])
+    expect(apiMock.get).toHaveBeenCalledWith(`/cli/v1/projects/${PID}/tickets/${T}/events?page=2`)
+  })
+
+  it('prints who did what and when, with the before and after of each edited field', async () => {
+    apiMock.get.mockResolvedValue(envelope(events, {page: 1, total_pages: 1}))
+    const {stdout} = await runCaptured(TicketsHistory, [T, '--project', PID])
+    expect(stdout).toContain('2026-11-14T10:00:00Z · Ada · updated')
+    expect(stdout).toContain('2026-11-13T09:00:00Z · Bea · created')
+    expect(stdout).toContain('description:')
+    expect(stdout).toContain('+ New description')
+    expect(stdout).toContain('- Low')
+    expect(stdout).toContain('+ High')
+    expect(stdout).toContain('- iOS')
+    expect(stdout).toContain('+ Android')
+  })
+
+  it('cuts long texts in the human view and points to --json', async () => {
+    apiMock.get.mockResolvedValue(envelope(events, {page: 1, total_pages: 1}))
+    const {stdout} = await runCaptured(TicketsHistory, [T, '--project', PID])
+    expect(stdout).not.toContain(longText)
+    expect(stdout).toContain('--json')
+  })
+
+  it('returns the full texts with --json', async () => {
+    apiMock.get.mockResolvedValue(envelope(events, {page: 1, total_pages: 1}))
+    const {result} = await runCaptured(TicketsHistory, [T, '--project', PID, '--json'])
+    expect((result as {data: typeof events}).data[0].data.description[0]).toBe(longText)
+  })
+
+  it('says so when there is no history', async () => {
+    apiMock.get.mockResolvedValue(envelope([], {page: 1, total_pages: 1}))
+    const {stdout} = await runCaptured(TicketsHistory, [T, '--project', PID])
+    expect(stdout).toContain('(no history)')
+  })
+
+  it('surfaces the missing permission as the server reports it', async () => {
+    apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Missing permission: tickets.audit.view'))
+    const {message} = await runExpectingExit(TicketsHistory, [T, '--project', PID], 4)
+    expect(message).toContain('R403-CLIAUTH-002')
   })
 })

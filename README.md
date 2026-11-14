@@ -163,6 +163,7 @@ a visible project; upload/delete also require `artifacts.manage` through the exi
 | `tickets report <id\|code> --project <id\|key> (--body <text> \| --body-file <path>)` | Write the work report — the long text a comment cannot hold (max 20000 characters). Each write adds a version, it never overwrites the previous one. |
 | `tickets report-show <id\|code> --project <id\|key> [--version <n>]` | Show the current work report, or a past version. |
 | `tickets report-versions <id\|code> --project <id\|key> [--page]` | List the versions of the work report (newest first). |
+| `tickets history <id\|code> --project <id\|key> [--page]` | Show the ticket history (newest first): who changed what, with the before and after of each edited field. Long texts are cut; `--json` returns them in full. Needs `tickets.audit.view`. |
 | `tickets reject <id> --project <id\|key> --reason <text>` | Reject the review: back to work, the reason becomes a comment. |
 | `tickets approve <id> --project <id\|key>` | Approve the review: move to the first done status. |
 | `tickets links <id> --project <id\|key>` | List the ticket-to-ticket links (duplicate/related) involving a ticket. |

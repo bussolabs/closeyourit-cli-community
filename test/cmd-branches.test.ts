@@ -69,6 +69,7 @@ import TicketsLinks from '../src/commands/tickets/links'
 import TicketsReport from '../src/commands/tickets/report'
 import TicketsReportShow from '../src/commands/tickets/report-show'
 import TicketsReportVersions from '../src/commands/tickets/report-versions'
+import TicketsHistory from '../src/commands/tickets/history'
 import TicketsReviewer from '../src/commands/tickets/reviewer'
 import TicketsShow from '../src/commands/tickets/show'
 import TicketsStatus from '../src/commands/tickets/status'
@@ -169,6 +170,7 @@ const arrayCommands: Entry[] = [
   ['tickets attachments', TicketsAttachments, ['tk-1', '-p', PID]],
   ['tickets links', TicketsLinks, ['tk-1', '-p', PID]],
   ['tickets report-versions', TicketsReportVersions, ['tk-1', '-p', PID]],
+  ['tickets history', TicketsHistory, ['tk-1', '-p', PID]],
   ['projects set-environments', ProjectsSetEnvironments, ['-p', PID, '--code', 'production']],
   ['errors grouping-rules list', ErrorsGroupingRulesList, ['-p', PID]],
 ]

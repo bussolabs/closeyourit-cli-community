@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-14
+
+### Aggiunto
+
+- **Cronologia di un ticket.** `tickets history` mostra chi ha cambiato cosa e quando, con il testo di prima e quello di dopo di ogni campo modificato. I testi lunghi sono tagliati; con `--json` arrivano interi. Serve il permesso di leggere la cronologia.
+
 ## [0.40.4] - 2026-11-13
 
 ### Corretto
