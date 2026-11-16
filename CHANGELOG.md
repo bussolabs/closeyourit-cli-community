@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-16
+
+### Aggiunto
+
+- **Rimandare un lavoro all'agente dal terminale.** `tickets reject --rework` respinge la consegna e la rimette in coda alla macchina, che legge il motivo al giro dopo. Senza l'opzione il ticket resta a una persona, come prima.
+
 ## [0.41.0] - 2026-11-14
 
 ### Aggiunto

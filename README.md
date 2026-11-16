@@ -164,7 +164,7 @@ a visible project; upload/delete also require `artifacts.manage` through the exi
 | `tickets report-show <id\|code> --project <id\|key> [--version <n>]` | Show the current work report, or a past version. |
 | `tickets report-versions <id\|code> --project <id\|key> [--page]` | List the versions of the work report (newest first). |
 | `tickets history <id\|code> --project <id\|key> [--page]` | Show the ticket history (newest first): who changed what, with the before and after of each edited field. Long texts are cut; `--json` returns them in full. Needs `tickets.audit.view`. |
-| `tickets reject <id> --project <id\|key> --reason <text>` | Reject the review: back to work, the reason becomes a comment. |
+| `tickets reject <id> --project <id\|key> --reason <text> [--rework]` | Reject the review: back to work, the reason becomes a comment. On agent work, `--rework` sends it back to the agent; without it the ticket is left to a person. |
 | `tickets approve <id> --project <id\|key>` | Approve the review: move to the first done status. |
 | `tickets links <id> --project <id\|key>` | List the ticket-to-ticket links (duplicate/related) involving a ticket. |
 | `tickets unlink <id> <link-id> --project <id\|key> --confirm` | Remove a ticket-to-ticket link (requires tickets.edit). |

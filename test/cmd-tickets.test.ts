@@ -947,6 +947,16 @@ describe('tickets reject / approve (review decision)', () => {
     expect(stdout).toContain('review rejected')
   })
 
+  it('reject --rework → the rejection sends the work back to the agent', async () => {
+    apiMock.post.mockResolvedValue(envelope({code: 'DRRA-1', status: 'In Progress'}))
+    const {stdout} = await runCaptured(TicketsReject, [T, '--project', PID, '--reason', 'Manca il test', '--rework'])
+    expect(apiMock.post).toHaveBeenCalledWith(
+      `/cli/v1/projects/${PID}/tickets/${T}/review/rejection`,
+      {reason: 'Manca il test', mode: 'rework'},
+    )
+    expect(stdout).toContain('sent back to the agent')
+  })
+
   it('reject without --reason → parse error (required flag, exit 2)', async () => {
     await runExpectingExit(TicketsReject, [T, '--project', PID], 2)
     expect(apiMock.post).not.toHaveBeenCalled()
