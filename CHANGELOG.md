@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-17
+
+### Modificato
+
+- **Serve Node 22 o più.** La CLI passa alla nuova versione di oclif, la libreria su cui è costruita, che non funziona più con Node 20. I comandi non cambiano.
+
 ## [0.43.0] - 2026-11-17
 
 ### Aggiunto
