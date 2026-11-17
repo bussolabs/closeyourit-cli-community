@@ -96,6 +96,41 @@ describe('tickets — full flag coverage', () => {
     })
   })
 
+  it('create sends --item as one list of acceptance items, plain or as a case (CYRA-1318)', async () => {
+    apiMock.post.mockResolvedValue(envelope({code: 'DRRA-11'}))
+    await runCaptured(TicketsCreate, [
+      '--project', PID, '--title', 'T',
+      '--item', 'Templates inspected',
+      '--item', '{"title":"Link present","step_given":"a client","step_expected":"sees the link"}',
+      '--status', STATUS_UUID, '--priority', PRIORITY_UUID,
+    ])
+    expect(apiMock.post).toHaveBeenCalledWith(`/cli/v1/projects/${PID}/tickets`, {
+      title: 'T', kind: 'bug',
+      acceptance_items: [
+        {format: 'text', text: 'Templates inspected'},
+        {title: 'Link present', step_given: 'a client', step_expected: 'sees the link', format: 'scenario'},
+      ],
+      status_id: STATUS_UUID, priority_id: PRIORITY_UUID,
+    })
+  })
+
+  it('create keeps the code of an --item that carries one', async () => {
+    apiMock.post.mockResolvedValue(envelope({code: 'DRRA-12'}))
+    await runCaptured(TicketsCreate, [
+      '--project', PID, '--title', 'T', '--item', '{"code":"AC-2","text":"Renamed"}',
+      '--status', STATUS_UUID, '--priority', PRIORITY_UUID,
+    ])
+    const body = apiMock.post.mock.calls[0][1] as Record<string, unknown>
+    expect(body.acceptance_items).toEqual([{code: 'AC-2', text: 'Renamed'}])
+  })
+
+  it('create refuses --item together with --condition', async () => {
+    await expect(
+      runCaptured(TicketsCreate, ['--project', PID, '--title', 'T', '--item', 'A', '--condition', 'B']),
+    ).rejects.toThrow('--item cannot be combined')
+    expect(apiMock.post).not.toHaveBeenCalled()
+  })
+
   it('create rejects an invalid --scenarios JSON', async () => {
     await expect(runCaptured(TicketsCreate, ['--project', PID, '--title', 'T', '--scenarios', 'not-json'])).rejects.toThrow(
       /valid JSON array/,
@@ -254,6 +289,23 @@ describe('tickets show', () => {
       return Promise.resolve(envelope(ticket))
     })
   }
+
+  it('shows the acceptance items with their codes when the server sends them (CYRA-1318)', async () => {
+    mockFullShow({
+      code: 'DRRA-1', title: 'Fix link',
+      scenarios: [{title: 'Old shape'}],
+      acceptance_items: [
+        {code: 'AC-1', format: 'text', text: 'Templates inspected'},
+        {code: 'AC-2', format: 'scenario', title: 'Link present', step_given: 'a client', step_expected: 'sees the link'},
+      ],
+    })
+    const {stdout} = await runCaptured(TicketsShow, [T, '--project', PID])
+    expect(stdout).toContain('Acceptance criteria')
+    expect(stdout).toContain('AC-1  Templates inspected')
+    expect(stdout).toContain('AC-2  Link present')
+    expect(stdout).toContain('Expected: sees the link')
+    expect(stdout).not.toContain('Old shape')
+  })
 
   it('fetches ticket, comments and attachments in a single command', async () => {
     mockFullShow({code: 'DRRA-1', title: 'Fix login'})

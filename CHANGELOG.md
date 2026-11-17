@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-17
+
+### Aggiunto
+
+- **Criteri di accettazione in una lista sola.** `tickets create` e `tickets update` accettano `--item`, come frase o come caso Given/When/Then. `tickets show` stampa ogni voce con il suo codice, per esempio AC-1. (CYCL-95)
+
 ## [0.42.0] - 2026-11-16
 
 ### Aggiunto

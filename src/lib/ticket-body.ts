@@ -21,6 +21,13 @@ export const ticketBodyFlags = {
   'step-then': Flags.string({description: 'Shorthand for a single scenario: Then (outcome)'}),
   'step-expected': Flags.string({description: 'Shorthand for a single scenario: Expected result'}),
   condition: Flags.string({description: 'Definition-of-Done line (repeatable)', multiple: true}),
+  // CYRA-1318 — the acceptance items as one list, the ticket's only source of what must be true at the end.
+  item: Flags.string({
+    description:
+      'Acceptance item (repeatable): a plain sentence, or JSON {"code","title","step_given","step_when","step_then","step_expected"} for a case. ' +
+      'Sends the whole list: an item with its code (AC-N) is updated and keeps it, an item left out is removed',
+    multiple: true,
+  }),
   weight: Flags.string({description: 'Story points (positive integer)'}),
   'due-at': Flags.string({description: 'Due date (ISO 8601)'}),
   // Status and priority are given by code, label or id, and the command resolves them (CYCL-34).
@@ -91,6 +98,27 @@ export function conditionsFromFlags(flags: BodyFlags): Array<{text: string}> | u
   return conditions.map((text) => ({text}))
 }
 
+const CASE_KEYS = ['step_given', 'step_when', 'step_then', 'step_expected']
+
+// Acceptance items from --item (repeatable): plain text, or a JSON object for a case or a coded item.
+export function itemsFromFlags(flags: BodyFlags): Array<Record<string, unknown>> | undefined {
+  const items = flags.item as string[] | undefined
+  if (items === undefined) return undefined
+  return items.map((raw) => {
+    if (!raw.trim().startsWith('{')) return {format: 'text', text: raw}
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new Error(`--item must be plain text or a valid JSON object: ${raw}`)
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('--item JSON must be an object')
+    const item = parsed as Record<string, unknown>
+    if (item.format !== undefined || item.code !== undefined) return item
+    return {...item, format: CASE_KEYS.some((key) => item[key] !== undefined) ? 'scenario' : 'text'}
+  })
+}
+
 // Fills `body` with the body fields present in the flags (snake_case keys expected by the CLI API).
 // Status and priority stay out: they must be resolved to ids against the organization lookups,
 // i.e. with a call, and each command adds them afterwards — with or without a default (CYCL-34).
@@ -105,9 +133,15 @@ export function applyTicketBody(body: BodyFlags, flags: BodyFlags): void {
   if (flags['platform-id'] !== undefined) body.platform_ids = flags['platform-id']
 
   const scenarios = scenariosFromFlags(flags)
-  if (scenarios !== undefined) body.scenarios_attributes = scenarios
-
   const conditions = conditionsFromFlags(flags)
+  const items = itemsFromFlags(flags)
+  // The one list and the two old ones would say two things about the same items: the server refuses both.
+  if (items !== undefined && (scenarios !== undefined || conditions !== undefined)) {
+    throw new Error('--item cannot be combined with --scenarios, --step-* or --condition')
+  }
+
+  if (items !== undefined) body.acceptance_items = items
+  if (scenarios !== undefined) body.scenarios_attributes = scenarios
   if (conditions !== undefined) body.conditions_attributes = conditions
 }
 

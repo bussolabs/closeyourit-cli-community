@@ -150,13 +150,44 @@ export default class TicketsShow extends BaseCommand {
       this.log(sanitizeMultiline(value))
     }
 
-    this.renderScenarios(Array.isArray(ticket.scenarios) ? (ticket.scenarios as Array<Record<string, unknown>>) : [])
-    this.renderConditions(Array.isArray(ticket.conditions) ? (ticket.conditions as Array<Record<string, unknown>>) : [])
+    // CYRA-1318 — a server that sends the one list shows it with its codes; an older one, the two lists.
+    if (Array.isArray(ticket.acceptance_items)) {
+      this.renderItems(ticket.acceptance_items as Array<Record<string, unknown>>)
+    } else {
+      this.renderScenarios(Array.isArray(ticket.scenarios) ? (ticket.scenarios as Array<Record<string, unknown>>) : [])
+      this.renderConditions(Array.isArray(ticket.conditions) ? (ticket.conditions as Array<Record<string, unknown>>) : [])
+    }
 
     // Effective guidance (references/procedures) when the backend ships it. Absent on older servers:
     // renderGuidance returns '' and nothing prints, so no misleading empty section (CYCL-2).
     const guidance = renderGuidance(ticket.guidance)
     if (guidance) this.log(guidance)
+  }
+
+  // Acceptance items: one line per plain item, one block per case, each with its code.
+  private renderItems(items: Array<Record<string, unknown>>): void {
+    if (items.length === 0) return
+    this.log(section('Acceptance criteria', '✅'))
+    const steps: Array<[string, string]> = [
+      ['Given', 'step_given'],
+      ['When', 'step_when'],
+      ['Then', 'step_then'],
+      ['Expected', 'step_expected'],
+    ]
+    for (const item of items) {
+      const code = sanitize(item.code ?? '')
+      if (item.format !== 'scenario') {
+        this.log(`${code}  ${sanitizeMultiline(item.text ?? '')}`)
+        continue
+      }
+
+      this.log(`${code}  ${sanitize(item.title ?? 'Case')}`)
+      for (const [label, key] of steps) {
+        const value = item[key]
+        if (value === null || value === undefined || String(value).trim() === '') continue
+        this.log(`      ${label}: ${sanitizeMultiline(value)}`)
+      }
+    }
   }
 
   // BDD scenarios: one block per scenario, only the steps present.
@@ -236,16 +267,20 @@ function agentText(ticket: Row, comments: Row[], attachments: Row[]): string {
   if (present(ticket.description)) lines.push('', '## Description', plainText(ticket.description))
   if (present(ticket.technical_analysis)) lines.push('', '## Technical analysis', plainText(ticket.technical_analysis))
 
-  rows(ticket.scenarios).forEach((scenario, index) => {
-    const title = plainText(scenario.title)
-    lines.push('', present(title) ? `## Scenario ${index + 1}: ${title}` : `## Scenario ${index + 1}`)
-    for (const [label, key] of AGENT_STEPS) if (present(scenario[key])) lines.push(`${label}: ${plainText(scenario[key])}`)
-  })
+  if (Array.isArray(ticket.acceptance_items)) {
+    const items = rows(ticket.acceptance_items)
+    if (items.length > 0) lines.push('', '## Acceptance criteria')
+    for (const item of items) {
+      if (item.format !== 'scenario') {
+        lines.push(`- ${plainText(item.code)}: ${plainText(item.text)}`)
+        continue
+      }
 
-  const conditions = rows(ticket.conditions)
-  if (conditions.length > 0) {
-    lines.push('', '## Definition of Done')
-    for (const condition of conditions) lines.push(`- ${plainText(condition.text)}`)
+      lines.push(`- ${plainText(item.code)}: ${plainText(item.title) || 'Case'}`)
+      for (const [label, key] of AGENT_STEPS) if (present(item[key])) lines.push(`  ${label}: ${plainText(item[key])}`)
+    }
+  } else {
+    agentLegacyBody(ticket, lines)
   }
 
   lines.push('', `## Comments (${comments.length})`)
@@ -259,4 +294,19 @@ function agentText(ticket: Row, comments: Row[], attachments: Row[]): string {
   for (const attachment of attachments) lines.push(`- ${plainText(attachment.filename)}`)
 
   return lines.join('\n')
+}
+
+/** The two old lists, for a server that does not send the acceptance items yet. */
+function agentLegacyBody(ticket: Row, lines: string[]): void {
+  rows(ticket.scenarios).forEach((scenario, index) => {
+    const title = plainText(scenario.title)
+    lines.push('', present(title) ? `## Scenario ${index + 1}: ${title}` : `## Scenario ${index + 1}`)
+    for (const [label, key] of AGENT_STEPS) if (present(scenario[key])) lines.push(`${label}: ${plainText(scenario[key])}`)
+  })
+
+  const conditions = rows(ticket.conditions)
+  if (conditions.length > 0) {
+    lines.push('', '## Definition of Done')
+    for (const condition of conditions) lines.push(`- ${plainText(condition.text)}`)
+  }
 }
