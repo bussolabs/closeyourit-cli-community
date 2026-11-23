@@ -183,11 +183,11 @@ describe('tickets questions', () => {
     it('rejects an answer over the cap without calling the service', async () => {
       const {message} = await runExpectingExit(
         TicketsQuestionsAnswer,
-        [T, '--project', PID, '--question-id', QID, '--body', 'a'.repeat(241)],
+        [T, '--project', PID, '--question-id', QID, '--body', 'a'.repeat(2001)],
         2,
       )
 
-      expect(message).toContain('max 240')
+      expect(message).toContain('max 2000')
       expect(apiMock.post).not.toHaveBeenCalled()
     })
 

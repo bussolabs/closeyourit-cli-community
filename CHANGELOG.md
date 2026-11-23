@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-23
+
+### Aggiunto
+
+- **Spostare un ticket in un altro progetto.** `tickets move <ticket> -p <progetto> --to <progetto>` lo porta nel progetto giusto con un codice nuovo; il vecchio codice lo ritrova ancora. (CYRA-1352)
+
+### Modificato
+
+- **Risposte alle domande fino a 2000 caratteri.** `tickets questions answer` accetta lo stesso limite del server. (CYRA-1338)
+
 ## [0.44.0] - 2026-11-17
 
 ### Modificato

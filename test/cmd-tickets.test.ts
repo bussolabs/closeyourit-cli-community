@@ -34,6 +34,7 @@ import TicketsLeaseRenew from '../src/commands/tickets/lease/renew'
 import TicketsLinks from '../src/commands/tickets/links'
 import TicketsList from '../src/commands/tickets/list'
 import TicketsMilestone from '../src/commands/tickets/milestone'
+import TicketsMove from '../src/commands/tickets/move'
 import TicketsPr from '../src/commands/tickets/pr'
 import TicketsReject from '../src/commands/tickets/reject'
 import TicketsReport from '../src/commands/tickets/report'
@@ -2259,5 +2260,26 @@ describe('tickets history', () => {
     apiMock.get.mockRejectedValue(apiError(403, 'R403-CLIAUTH-002', 'Missing permission: tickets.audit.view'))
     const {message} = await runExpectingExit(TicketsHistory, [T, '--project', PID], 4)
     expect(message).toContain('R403-CLIAUTH-002')
+  })
+})
+
+// CYRA-1352 — a ticket opened in the wrong project moves to the right one and takes a new code there.
+describe('tickets move', () => {
+  it('posts the target project and prints the new code', async () => {
+    apiMock.post.mockResolvedValue(envelope({code: 'LBRA-309'}))
+    const {stdout} = await runCaptured(TicketsMove, [T, '--project', PID, '--to', 'LBRA'])
+    expect(apiMock.post).toHaveBeenCalledWith(`/cli/v1/projects/${PID}/tickets/${T}/move`, {target_project: 'LBRA'})
+    expect(stdout).toContain('LBRA-309')
+  })
+
+  it('requires --to (exit 2)', async () => {
+    const {message} = await runExpectingExit(TicketsMove, [T, '--project', PID], 2)
+    expect(message).toContain('Missing required flag to')
+  })
+
+  it('exits non-zero with the server reason when the move is refused', async () => {
+    apiMock.post.mockRejectedValue(apiError(409, 'R409-TICKET-027', 'A machine is working on it.'))
+    const {stderr} = await runExpectingExit(TicketsMove, [T, '--project', PID, '--to', 'LBRA'])
+    expect(stderr).toContain('R409-TICKET-027')
   })
 })

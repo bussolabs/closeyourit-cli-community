@@ -17,7 +17,7 @@ export const LENGTH_LIMITS = {
    *  the day an answer needs more room that one is raised, not the discussion cap
    *  (Ticketing::Constants::QUESTION_MAX_CHARS / ANSWER_MAX_CHARS). */
   question: 240,
-  answer: 240,
+  answer: 2_000,
   report: 20_000,
   pageBody: 4_000,
   techSpec: 1_500,
