@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.45.1] - 2026-11-23
+
+### Modificato
+
+- **Rilasci pubblicati da macchine pulite.** La pubblicazione su npm e la copia pubblica partono da una macchina GitHub nuova a ogni rilascio, non più dalle macchine condivise delle prove. Per chi usa la CLI non cambia niente. (CYCL-80)
+
 ## [0.45.0] - 2026-11-23
 
 ### Aggiunto
